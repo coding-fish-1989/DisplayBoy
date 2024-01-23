@@ -3,7 +3,7 @@ Web app to make GBC and GBA screenshots look closer to the real thing.
 
 No support for GB at this moment, although I would like to at some stage.
 
-Written in Go, compiled to WASM.
+Written in Go, compiled to WASM. All code runs locally on your browser, nothing is sent to a server.
 
 ## Building
 ```
