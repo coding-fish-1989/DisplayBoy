@@ -7,6 +7,9 @@ Written in Go, compiled to WASM. All code runs locally on your browser, nothing 
 
 [Live Demo](https://coding-fish-1989.github.io/displayboy/)
 
+## Notes
+Most of the image operations are ported from various shaders. They all run on the CPU instead of the GPU, and Go on WASM cannot perform tasks in parallel, which results in a significant performance hit. However, it is still fast enough for the purpose of this app.
+
 ## Building
 ```
 GOOS=js GOARCH=wasm go build -o main.wasm
