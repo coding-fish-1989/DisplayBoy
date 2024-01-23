@@ -5,6 +5,8 @@ No support for GB at this moment, although I would like to at some stage.
 
 Written in Go, compiled to WASM. All code runs locally on your browser, nothing is sent to a server.
 
+[Live Demo](https://coding-fish-1989.github.io/displayboy/)
+
 ## Building
 ```
 GOOS=js GOARCH=wasm go build -o main.wasm
