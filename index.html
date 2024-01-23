@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="css/pico.min.css">
+        <title>DisplayBoy</title>
+    </head>
+    <body>
+        <main class="container">
+            <nav style="float:right">
+                <ul>
+                    <li><a href="https://github.com/coding-fish-1989/DisplayBoy" target="_blank">GitHub</a></li>
+                    <li><a href="https://github.com/coding-fish-1989/DisplayBoy/blob/master/ATTRIBUTIONS.md" target="_blank">Attributions</a></li>
+                </ul>
+            </nav>
+            <h1>DisplayBoy</h1>
+            <fieldset>
+                <label for="colorMode">Color Correction
+            		<select id="colorMode" name="colorMode">
+            			<option value="gbc">GBC</option>
+            			<option value="gba">GBA</option>
+            			<option value="gbaSp">GBA SP</option>
+            			<option value="gbaSpWhite">GBA SP White</option>
+            		</select>
+            	</label>
+            	<label for="lcdMode">LCD Mode
+            		<select id="lcdMode" name="lcdMode">
+            			<option value="sameboy">Sameboy</option>
+            			<option value="lcdv2">LCD Grid v2</option>
+            			<option value="off">Off</option>
+            		</select>
+            	</label>
+            	<output id="scaling-value" style="float:right">5</output>
+            	<label for="scaling">Scale
+            		<input id="scaling" name="scaling" type="range" min="1" max="8" value="5" oninput="this.parentElement.previousElementSibling.value = this.value">
+            	</label>
+            	
+            	<input type="file" id="fileInput">
+            	<button type="button" id="convertButton">Go</button>
+        	</fieldset>
+        	<img id="fileOutput" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="Filtered Image">
+        </main>
+        <script src="./wasm_exec.js"></script>
+        <script>
+        const go = new Go();
+        WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((result) => {
+            go.run(result.instance);
+        });
+        </script>
+    </body>
+</html>
