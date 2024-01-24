@@ -12,7 +12,7 @@ Most of the image operations are ported from various shaders. They all run on th
 
 ## Building
 ```
-GOOS=js GOARCH=wasm go build -o main.wasm
+GOOS=js GOARCH=wasm go build -ldflags="-s -w" -trimpath -o main.wasm
 ```
 
 ## Running Locally
