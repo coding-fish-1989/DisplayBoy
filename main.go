@@ -4,9 +4,11 @@ import (
 	"bytes"
 	_ "embed"
 	b64 "encoding/base64"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
+	_ "image/jpeg"
 	"image/png"
 	"math"
 	"strconv"
@@ -345,10 +347,10 @@ func approximetlyEqual(a, b float64) bool {
 	return diff < tolerance
 }
 
-func execute(input []byte, colorMode, lcdMode, scaling int) []byte {
-	img, err := png.Decode(bytes.NewReader(input))
+func execute(input []byte, colorMode, lcdMode, scale int) ([]byte, error) {
+	img, _, err := image.Decode(bytes.NewReader(input))
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	bounds := img.Bounds()
@@ -367,6 +369,10 @@ func execute(input []byte, colorMode, lcdMode, scaling int) []byte {
 		// GBC aspect ratio
 		mult = width / 160
 		fmt.Println("GBC")
+	}
+
+	if (width/mult*scale)*(height/mult*scale) > (240 * 160 * 8 * 8) {
+		return nil, errors.New("The expected output image size is too large")
 	}
 
 	// Pokefan531's display profiles
@@ -405,11 +411,11 @@ func execute(input []byte, colorMode, lcdMode, scaling int) []byte {
 		prof = gbaSpWhite
 	}
 
-	out := lcdGrid(img, mult, scaling, lcdMode, prof)
+	out := lcdGrid(img, mult, scale, lcdMode, prof)
 
 	buf := new(bytes.Buffer)
 	err = png.Encode(buf, out)
-	return buf.Bytes()
+	return buf.Bytes(), err
 }
 
 func main() {
@@ -425,6 +431,7 @@ func main() {
 	lcdMode := document.Call("getElementById", "lcdMode")
 	scaling := document.Call("getElementById", "scaling")
 	convertButton := document.Call("getElementById", "convertButton")
+	errorText := document.Call("getElementById", "convError")
 
 	convertButton.Set("onclick", js.FuncOf(func(v js.Value, x []js.Value) any {
 		file := fileInput.Get("files").Call("item", 0)
@@ -437,10 +444,18 @@ func main() {
 			js.CopyBytesToGo(dst, data)
 
 			scaling, _ := strconv.Atoi(scaling.Get("value").String())
-			dst = execute(dst, colorMode.Get("selectedIndex").Int(), lcdMode.Get("selectedIndex").Int(), scaling)
+			scaling = min(max(scaling, 1), 8)
+			dst, err := execute(dst, colorMode.Get("selectedIndex").Int(), lcdMode.Get("selectedIndex").Int(), scaling)
 
-			sEnc := b64.StdEncoding.EncodeToString([]byte(dst))
-			fileOutput.Set("src", "data:image/png;base64,"+sEnc)
+			if err == nil {
+				sEnc := b64.StdEncoding.EncodeToString([]byte(dst))
+				fileOutput.Set("src", "data:image/png;base64,"+sEnc)
+				errorText.Set("innerHTML", "")
+			} else {
+				// Blank gif
+				fileOutput.Set("src", "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
+				errorText.Set("innerHTML", err.Error())
+			}
 
 			return nil
 		}))
