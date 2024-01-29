@@ -1,7 +1,5 @@
 # DisplayBoy
-Web app to make GBC and GBA screenshots look closer to the real thing.
-
-No support for GB at this moment, although I would like to at some stage.
+Web app to make GB, GBC and GBA screenshots look closer to the real thing.
 
 Written in Go, compiled to WASM. All code runs locally on your browser, nothing is sent to a server.
 
