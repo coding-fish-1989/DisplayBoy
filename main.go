@@ -239,6 +239,173 @@ func lcdGrid(img image.Image, srcScale, scale int, lcdMode int, prof DisplayProf
 	return out
 }
 
+func loadBufferChecked(buff [][]float32, x, y, width, height int) float32 {
+	if x < 0 || x >= width || y < 0 || y >= height {
+		return 0
+	}
+	return buff[y][x]
+}
+
+func allocateAlphaBuff(width, height int) [][]float32 {
+	buff := make([][]float32, height)
+	for y := 0; y < height; y++ {
+		buff[y] = make([]float32, width)
+	}
+	return buff
+}
+
+type GbDisplayProfile struct {
+	ForegroundR, ForegroundG, ForegroundB float64
+	BackgroundR, BackgroundG, BackgroundB float64
+}
+
+func gbUpscale(img image.Image, srcScale int, profile GbDisplayProfile) image.Image {
+	bounds := img.Bounds()
+	srcWidth, srcHeight := bounds.Max.X, bounds.Max.Y
+
+	// Quantize to alpha, downscale to real device resolution, and store
+	buff := make([][]float32, srcHeight/srcScale)
+	for y := 0; y < srcHeight; y += srcScale {
+		row := make([]float32, srcWidth/srcScale)
+		for x := 0; x < srcWidth; x += srcScale {
+			row[x/srcScale] = rgbaToGbAlpha(img.At(x, y).RGBA())
+		}
+		buff[y/srcScale] = row
+	}
+
+	srcWidth /= srcScale
+	srcHeight /= srcScale
+
+	// Don't change this without revising pretty much everything after this
+	scale := 5
+
+	width, height := srcWidth*scale, srcHeight*scale
+
+	// Color configurations
+	fg := FloatColor{profile.ForegroundR, profile.ForegroundG, profile.ForegroundB}.Linear()
+	bg := FloatColor{profile.BackgroundR, profile.BackgroundG, profile.BackgroundB}.Linear()
+
+	// Final output should have GB LCD margin
+	// This margin also accounts for the edge smear and shadow blur expansion
+	nativeMargin := 5
+	margin := nativeMargin * scale
+	outWidth, outHeight := width+margin*2, height+margin*2
+
+	// Prepare buffers for separable gaussian blur
+	// Should be about 2.46 MB on memory per buffer for full GameBoy resolution with margin above
+	bgPingBuff := allocateAlphaBuff(outWidth, outHeight)
+	bgPongBuff := allocateAlphaBuff(outWidth, outHeight)
+
+	// Upscale with grid line
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// Gap between pixels. This code only works for resolution scale of 5.
+			if (x%5) >= 4 || (y%5) >= 4 {
+				continue
+			}
+			bgPingBuff[y+margin][x+margin] = buff[y/scale][x/scale]
+		}
+	}
+
+	// Apply small blur to smear the pixel edges
+	{
+		// Subjective smear kernel
+		var kernel = [...]float32{0.1, 0.8}
+
+		// Horizontal gaussian blur pass
+		for y := 0; y < outHeight; y++ {
+			for x := 0; x < outWidth; x++ {
+				g := float32(0)
+				g += loadBufferChecked(bgPingBuff, x-1, y, outWidth, outHeight) * kernel[0]
+				g += loadBufferChecked(bgPingBuff, x+0, y, outWidth, outHeight) * kernel[1]
+				g += loadBufferChecked(bgPingBuff, x+1, y, outWidth, outHeight) * kernel[0]
+				bgPongBuff[y][x] = g
+			}
+		}
+
+		bgPingBuff, bgPongBuff = bgPongBuff, bgPingBuff
+
+		// Vertical gaussian blur pass
+		for y := 0; y < outHeight; y++ {
+			for x := 0; x < outWidth; x++ {
+				g := float32(0)
+				g += loadBufferChecked(bgPingBuff, x, y-1, outWidth, outHeight) * kernel[0]
+				g += loadBufferChecked(bgPingBuff, x, y+0, outWidth, outHeight) * kernel[1]
+				g += loadBufferChecked(bgPingBuff, x, y+1, outWidth, outHeight) * kernel[0]
+				bgPongBuff[y][x] = g
+			}
+		}
+
+		bgPingBuff, bgPongBuff = bgPongBuff, bgPingBuff
+	}
+
+	// Gaussian blur result from above is now kept as a foreground buffer
+	fgBuff := bgPingBuff
+
+	// Create a new buffer for shadow pass
+	bgPingBuff = allocateAlphaBuff(outWidth, outHeight)
+
+	// Apply larger blur for shadowing
+	{
+		// Gaussian kernel
+		var kernel = [...]float32{0.006, 0.061, 0.241, 0.383}
+
+		// Horizontal gaussian blur pass
+		// It takes in blurred foreground buffer as an input to slightly increase the blur radius
+		for y := 0; y < outHeight; y++ {
+			for x := 0; x < outWidth; x++ {
+				g := float32(0)
+				g += loadBufferChecked(fgBuff, x-3, y, outWidth, outHeight) * kernel[0]
+				g += loadBufferChecked(fgBuff, x-2, y, outWidth, outHeight) * kernel[1]
+				g += loadBufferChecked(fgBuff, x-1, y, outWidth, outHeight) * kernel[2]
+				g += loadBufferChecked(fgBuff, x+0, y, outWidth, outHeight) * kernel[3]
+				g += loadBufferChecked(fgBuff, x+1, y, outWidth, outHeight) * kernel[2]
+				g += loadBufferChecked(fgBuff, x+2, y, outWidth, outHeight) * kernel[1]
+				g += loadBufferChecked(fgBuff, x+3, y, outWidth, outHeight) * kernel[0]
+				bgPingBuff[y][x] = g
+			}
+		}
+
+		// Vertical gaussian blur pass
+		for y := 0; y < outHeight; y++ {
+			for x := 0; x < outWidth; x++ {
+				g := float32(0)
+				g += loadBufferChecked(bgPingBuff, x, y-3, outWidth, outHeight) * kernel[0]
+				g += loadBufferChecked(bgPingBuff, x, y-2, outWidth, outHeight) * kernel[1]
+				g += loadBufferChecked(bgPingBuff, x, y-1, outWidth, outHeight) * kernel[2]
+				g += loadBufferChecked(bgPingBuff, x, y+0, outWidth, outHeight) * kernel[3]
+				g += loadBufferChecked(bgPingBuff, x, y+1, outWidth, outHeight) * kernel[2]
+				g += loadBufferChecked(bgPingBuff, x, y+2, outWidth, outHeight) * kernel[1]
+				g += loadBufferChecked(bgPingBuff, x, y+3, outWidth, outHeight) * kernel[0]
+				bgPongBuff[y][x] = g
+			}
+		}
+
+		bgPingBuff, bgPongBuff = bgPongBuff, bgPingBuff
+	}
+
+	bgShadowBuff := bgPingBuff
+
+	shadowOpacity := 0.5
+	shadowOffset := 1
+
+	out := image.NewNRGBA(image.Rect(0, 0, outWidth, outHeight))
+	for y := 0; y < outWidth; y++ {
+		for x := 0; x < outWidth; x++ {
+			// Background shadowing
+			shadow := float64(loadBufferChecked(bgShadowBuff, x-shadowOffset, y-shadowOffset, outWidth, outHeight))
+			c := bg.MultF(1.0 - shadow*shadowOpacity)
+			// Alpha blend foreground
+			opacity := float64(loadBufferChecked(fgBuff, x, y, outWidth, outHeight))
+			c = fg.MultF(opacity).Add(c.MultF(1.0 - opacity))
+			// Gamma compression
+			c = c.Gamma()
+			out.Set(x, y, c.NRGBA())
+		}
+	}
+	return out
+}
+
 type FloatColor struct {
 	R float64
 	G float64
@@ -267,6 +434,10 @@ func (p FloatColor) Sub(rhs FloatColor) FloatColor {
 
 func clamp(f, low, high float64) float64 {
 	return min(max(f, low), high)
+}
+
+func clamp01(f float64) float64 {
+	return min(max(f, 0), 1)
 }
 
 func (p FloatColor) Clamp01() FloatColor {
@@ -341,6 +512,25 @@ func rgbaToLinearColor(r, g, b, a uint32) FloatColor {
 	return FloatColor{linearTable[r>>8], linearTable[g>>8], linearTable[b>>8]}
 }
 
+func rgbaToGbAlpha(r, g, b, a uint32) float32 {
+	// Luminance (just in case the input isn't GB)
+	gray := (float64(r>>8)/float64(0xff)*0.2126 + float64(g>>8)/float64(0xff)*0.7152 + float64(b>>8)/float64(0xff)*0.0722)
+	// Quantize to 4 shades
+	s := floatToByte(gray) / 64
+	// Custom intensity for each shades
+	switch s {
+	case 0:
+		return 1.0
+	case 1:
+		return 0.66666667
+	case 2:
+		return 0.33333333
+	case 3:
+		return 0.07
+	}
+	return 0
+}
+
 func approximetlyEqual(a, b float64) bool {
 	tolerance := 0.001
 	diff := math.Abs(a - b)
@@ -366,13 +556,23 @@ func execute(input []byte, colorMode, lcdMode, scale int) ([]byte, error) {
 		fmt.Println("GBA")
 	}
 	if approximetlyEqual(float64(width)/float64(height), 1.11111111111111111111) {
-		// GBC aspect ratio
+		// GB aspect ratio
 		mult = width / 160
-		fmt.Println("GBC")
+		fmt.Println("GB")
 	}
 
 	if (width/mult*scale)*(height/mult*scale) > (240 * 160 * 8 * 8) {
 		return nil, errors.New("The expected output image size is too large")
+	}
+
+	gb := GbDisplayProfile{
+		19.0 / 255.0, 74.0 / 255.0, 7.0 / 255.0,
+		170.0 / 255.0, 181.0 / 255.0, 19.0 / 255.0,
+	}
+
+	gbp := GbDisplayProfile{
+		0.0 / 255.0, 0.0 / 255.0, 0.0 / 255.0,
+		164.0 / 255.0, 169.0 / 255.0, 137.0 / 255.0,
 	}
 
 	// Pokefan531's display profiles
@@ -398,20 +598,40 @@ func execute(input []byte, colorMode, lcdMode, scale int) ([]byte, error) {
 		false,
 	}
 
-	var prof DisplayProfile
+	var out image.Image
 
-	switch colorMode {
-	case 0:
-		prof = gbc
-	case 1:
-		prof = gba
-	case 2:
-		prof = gbaSp
-	case 3:
-		prof = gbaSpWhite
+	if colorMode <= 1 {
+		// GB or GBP
+		var prof GbDisplayProfile
+
+		switch colorMode {
+		case 0:
+			prof = gb
+		case 1:
+			prof = gbp
+		}
+
+		out = gbUpscale(img, mult, prof)
+	} else {
+		colorMode -= 2
+
+		var prof DisplayProfile
+
+		switch colorMode {
+		case 0:
+			prof = gbc
+		case 1:
+			prof = gba
+		case 2:
+			prof = gbaSp
+		case 3:
+			prof = gbaSpWhite
+		}
+
+		prof = prof
+
+		out = lcdGrid(img, mult, scale, lcdMode, prof)
 	}
-
-	out := lcdGrid(img, mult, scale, lcdMode, prof)
 
 	buf := new(bytes.Buffer)
 	err = png.Encode(buf, out)

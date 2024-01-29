@@ -2,10 +2,15 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <meta name="description" content="Make GBC and GBA screenshots look closer to the real thing">
+        <meta name="description" content="Make GB, GBC and GBA screenshots look closer to the real thing">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="css/pico.min.css">
         <title>DisplayBoy</title>
+        <style>
+.invisible {
+    display:none;
+}
+        </style>
     </head>
     <body>
         <main class="container">
@@ -17,38 +22,42 @@
             </nav>
             <h1>DisplayBoy</h1>
             <fieldset>
-                <label for="colorMode">Color Correction
-            		<select id="colorMode" name="colorMode">
-            			<option value="gbc">GBC</option>
-            			<option value="gba">GBA</option>
-            			<option value="gbaSp">GBA SP</option>
-            			<option value="gbaSpWhite">GBA SP White</option>
-            		</select>
-            	</label>
-            	<label for="lcdMode">LCD Mode
-            		<select id="lcdMode" name="lcdMode">
-            			<option value="sameboy">Sameboy</option>
-            			<option value="lcdv2">LCD Grid v2</option>
-            			<option value="off">Off</option>
-            		</select>
-            	</label>
-            	<output id="scaling-value" style="float:right">5</output>
-            	<label for="scaling">Scale
-            		<input id="scaling" name="scaling" type="range" min="1" max="8" value="5" oninput="this.parentElement.previousElementSibling.value = this.value">
-            	</label>
-            	
-            	<input type="file" id="fileInput">
-            	<button type="button" id="convertButton">Go</button>
+                <label for="colorMode">Color Mode
+                    <select id="colorMode" name="colorMode" oninput="this.selectedIndex <= 1 ? getElementById('miscParams').classList.add('invisible') : getElementById('miscParams').classList.remove('invisible')">
+                        <option value="gb">GB</option>
+                        <option value="gbp">GBP</option>
+                        <option value="gbc">GBC</option>
+                        <option value="gba">GBA</option>
+                        <option value="gbaSp">GBA SP</option>
+                        <option value="gbaSpWhite">GBA SP White</option>
+                    </select>
+                </label>
+                <div id="miscParams" class="invisible">
+                    <label for="lcdMode">LCD Mode
+                        <select id="lcdMode" name="lcdMode">
+                            <option value="sameboy">Sameboy</option>
+                            <option value="lcdv2">LCD Grid v2</option>
+                            <option value="off">Off</option>
+                        </select>
+                    </label>
+                    <output id="scaling-value" style="float:right">5</output>
+                    <label for="scaling">Scale
+                        <input id="scaling" name="scaling" type="range" min="1" max="8" value="5" oninput="this.parentElement.previousElementSibling.value = this.value">
+                    </label>
+                </div>
+
+                <input type="file" id="fileInput">
+                <button type="button" id="convertButton">Go</button>
                 <small id="convError" style="color:red"></small>
-        	</fieldset>
-                <img id="fileOutput" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Filtered Image">
+            </fieldset>
+            <img id="fileOutput" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Filtered Image">
         </main>
         <script src="./wasm_exec.js"></script>
         <script>
-        const go = new Go();
-        WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((result) => {
-            go.run(result.instance);
-        });
+            const go = new Go();
+            WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((result) => {
+                go.run(result.instance);
+            });
         </script>
     </body>
 </html>
