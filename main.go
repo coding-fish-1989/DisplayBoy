@@ -35,6 +35,10 @@ func colorCorrect(c FloatColor, p DisplayProfile) FloatColor {
 	return c
 }
 
+func calculateScaledBufferSize(width, height, scale int) (int, int) {
+	return int(math.Ceil(float64(width) / float64(scale))), int(math.Ceil(float64(height) / float64(scale)))
+}
+
 func intSmearFunc(z float64, coeffs [7]float64) float64 {
 	z2 := z * z
 	zn := z
@@ -56,18 +60,19 @@ func lcdGrid(img image.Image, srcScale, scale int, lcdMode int, prof DisplayProf
 	bounds := img.Bounds()
 	srcWidth, srcHeight := bounds.Max.X, bounds.Max.Y
 
+	// Need to accomodate for non integer scaling
+	targetWidth, targetHeight := calculateScaledBufferSize(srcWidth, srcHeight, srcScale)
 	// Linearize, downscale to real device resolution, and store
-	buff := make([][]FloatColor, srcHeight/srcScale)
+	buff := make([][]FloatColor, targetHeight)
 	for y := 0; y < srcHeight; y += srcScale {
-		row := make([]FloatColor, srcWidth/srcScale)
+		row := make([]FloatColor, targetWidth)
 		for x := 0; x < srcWidth; x += srcScale {
 			row[x/srcScale] = rgbaToLinearColor(img.At(x, y).RGBA())
 		}
 		buff[y/srcScale] = row
 	}
 
-	srcWidth /= srcScale
-	srcHeight /= srcScale
+	srcWidth, srcHeight = targetWidth, targetHeight
 	width, height := srcWidth*scale, srcHeight*scale
 
 	srcWidthF := float64(srcWidth)
@@ -263,18 +268,19 @@ func gbUpscale(img image.Image, srcScale int, profile GbDisplayProfile) image.Im
 	bounds := img.Bounds()
 	srcWidth, srcHeight := bounds.Max.X, bounds.Max.Y
 
+	// Need to accomodate for non integer scaling
+	targetWidth, targetHeight := calculateScaledBufferSize(srcWidth, srcHeight, srcScale)
 	// Quantize to alpha, downscale to real device resolution, and store
-	buff := make([][]float32, srcHeight/srcScale)
+	buff := make([][]float32, targetHeight)
 	for y := 0; y < srcHeight; y += srcScale {
-		row := make([]float32, srcWidth/srcScale)
+		row := make([]float32, targetWidth)
 		for x := 0; x < srcWidth; x += srcScale {
 			row[x/srcScale] = rgbaToGbAlpha(img.At(x, y).RGBA())
 		}
 		buff[y/srcScale] = row
 	}
 
-	srcWidth /= srcScale
-	srcHeight /= srcScale
+	srcWidth, srcHeight = targetWidth, targetHeight
 
 	// Don't change this without revising pretty much everything after this
 	scale := 5
