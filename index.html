@@ -11,6 +11,11 @@
 .invisible {
     display:none;
 }
+#fileOutput {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
         </style>
     </head>
     <body>
@@ -21,7 +26,7 @@
                     <li><a href="https://github.com/coding-fish-1989/DisplayBoy/blob/main/ATTRIBUTIONS.md" target="_blank">Attributions</a></li>
                 </ul>
             </nav>
-            <h1>DisplayBoy</h1>
+            <img src="img/db_logo.png" alt="DisplayBoy Logo" style="width: 490px; margin-bottom: 20pt; margin-left: -5px">
             <fieldset>
                 <label for="colorMode">Color Mode
                     <select id="colorMode" name="colorMode" oninput="this.selectedIndex <= 1 ? getElementById('miscParams').classList.add('invisible') : getElementById('miscParams').classList.remove('invisible')">
