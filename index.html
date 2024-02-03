@@ -26,7 +26,10 @@
                     <li><a href="https://github.com/coding-fish-1989/DisplayBoy/blob/main/ATTRIBUTIONS.md" target="_blank">Attributions</a></li>
                 </ul>
             </nav>
-            <img src="img/db_logo.png" alt="DisplayBoy Logo" style="width: 490px; margin-bottom: 20pt; margin-left: -5px">
+            <picture>
+                <source srcset="img/db_logo_dark.png" media="(prefers-color-scheme: dark)">
+                <img src="img/db_logo.png" alt="DisplayBoy Logo" style="width: 490px; margin-bottom: 20pt; margin-left: -5px">
+            </picture>
             <fieldset>
                 <label for="colorMode">Color Mode
                     <select id="colorMode" name="colorMode" oninput="this.selectedIndex <= 1 ? getElementById('miscParams').classList.add('invisible') : getElementById('miscParams').classList.remove('invisible')">
