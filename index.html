@@ -17,6 +17,23 @@
     margin-right: auto;
 }
         </style>
+        <script type = "text/javascript">
+            function updateForm(index) {
+                var miscParamsClass = document.getElementById('miscParams').classList;
+                var gbCustomFormClass = document.getElementById('gbCustomForm').classList;
+
+                if (index <= 2)  {
+                    miscParamsClass.add('invisible');
+                } else {
+                    miscParamsClass.remove('invisible');
+                }
+                if (index != 2)  {
+                    gbCustomFormClass.add('invisible');
+                } else {
+                    gbCustomFormClass.remove('invisible');
+                }
+            }
+        </script>
     </head>
     <body>
         <main class="container">
@@ -32,15 +49,32 @@
             </picture>
             <fieldset>
                 <label for="colorMode">Color Mode
-                    <select id="colorMode" name="colorMode" oninput="this.selectedIndex <= 1 ? getElementById('miscParams').classList.add('invisible') : getElementById('miscParams').classList.remove('invisible')">
+                    <select id="colorMode" name="colorMode" oninput="updateForm(this.selectedIndex)">
                         <option value="gb">GB</option>
                         <option value="gbp">GBP</option>
+                        <option value="gbCustom">GB Custom</option>
                         <option value="gbc">GBC</option>
                         <option value="gba">GBA</option>
                         <option value="gbaSp">GBA SP</option>
                         <option value="gbaSpWhite">GBA SP White</option>
                     </select>
                 </label>
+                <div id="gbCustomForm" class="grid invisible">
+                    <div>
+                        <label for="gbCustomBg">Background Color
+                            <input type="color" id="gbCustomBg" name="gbCustomBg" value="#aab513" />
+                        </label>
+                    </div>
+                    <div>
+                        <label for="gbCustomBg">Foreground Color
+                            <input type="color" id="gbCustomFg" name="gbCustomFg" value="#134a07" />
+                        </label>
+                        <output style="float:right">100</output>
+                        <label for="gbCustomFgOpacity">Opacity
+                            <input id="gbCustomFgOpacity" name="gbCustomFgOpacity" type="range" min="0" max="100" value="100" oninput="this.parentElement.previousElementSibling.value = this.value">
+                        </label>
+                    </div>
+                </div>
                 <div id="miscParams" class="invisible">
                     <label for="lcdMode">LCD Mode
                         <select id="lcdMode" name="lcdMode">

@@ -260,13 +260,21 @@ func allocateAlphaBuff(width, height int) [][]float32 {
 }
 
 type GbDisplayProfile struct {
-	ForegroundR, ForegroundG, ForegroundB float64
-	BackgroundR, BackgroundG, BackgroundB float64
+	ForegroundR, ForegroundG, ForegroundB, ForegroundA float64
+	BackgroundR, BackgroundG, BackgroundB              float64
 }
 
 func gbUpscale(img image.Image, srcScale int, profile GbDisplayProfile) image.Image {
 	bounds := img.Bounds()
 	srcWidth, srcHeight := bounds.Max.X, bounds.Max.Y
+
+	// Color configurations
+	fg := FloatColor{profile.ForegroundR, profile.ForegroundG, profile.ForegroundB}.Linear()
+	// Foreground color is not premultiplied on purpose since alpha is multiplied in foreground alpha quantization phase
+	fgOpacity := profile.ForegroundA
+	// Background color does not support opacity. This is because GB LCD has to be composited in linear space to look correct.
+	// sRGB PNG is generated in this program, which means we can't really output correct image to be composited to abitary image..
+	bg := FloatColor{profile.BackgroundR, profile.BackgroundG, profile.BackgroundB}.Linear()
 
 	// Need to accomodate for non integer scaling
 	targetWidth, targetHeight := calculateScaledBufferSize(srcWidth, srcHeight, srcScale)
@@ -275,7 +283,9 @@ func gbUpscale(img image.Image, srcScale int, profile GbDisplayProfile) image.Im
 	for y := 0; y < srcHeight; y += srcScale {
 		row := make([]float32, targetWidth)
 		for x := 0; x < srcWidth; x += srcScale {
-			row[x/srcScale] = rgbaToGbAlpha(img.At(x, y).RGBA())
+			alpha := rgbaToGbAlpha(img.At(x, y).RGBA())
+			alpha *= float32(fgOpacity)
+			row[x/srcScale] = alpha
 		}
 		buff[y/srcScale] = row
 	}
@@ -287,10 +297,6 @@ func gbUpscale(img image.Image, srcScale int, profile GbDisplayProfile) image.Im
 
 	width, height := srcWidth*scale, srcHeight*scale
 
-	// Color configurations
-	fg := FloatColor{profile.ForegroundR, profile.ForegroundG, profile.ForegroundB}.Linear()
-	bg := FloatColor{profile.BackgroundR, profile.BackgroundG, profile.BackgroundB}.Linear()
-
 	// Final output should have GB LCD margin
 	// This margin also accounts for the edge smear and shadow blur expansion
 	nativeMargin := 5
@@ -298,7 +304,7 @@ func gbUpscale(img image.Image, srcScale int, profile GbDisplayProfile) image.Im
 	outWidth, outHeight := width+margin*2, height+margin*2
 
 	// Prepare buffers for separable gaussian blur
-	// Should be about 2.46 MB on memory per buffer for full GameBoy resolution with margin above
+	// Should be about 2.46 MB on memory per buffer for full GB resolution with margin above
 	bgPingBuff := allocateAlphaBuff(outWidth, outHeight)
 	bgPongBuff := allocateAlphaBuff(outWidth, outHeight)
 
@@ -400,7 +406,8 @@ func gbUpscale(img image.Image, srcScale int, profile GbDisplayProfile) image.Im
 		for x := 0; x < outWidth; x++ {
 			// Background shadowing
 			shadow := float64(loadBufferChecked(bgShadowBuff, x-shadowOffset, y-shadowOffset, outWidth, outHeight))
-			c := bg.MultF(1.0 - shadow*shadowOpacity)
+			shadow *= shadowOpacity
+			c := bg.MultF(1.0 - shadow)
 			// Alpha blend foreground
 			opacity := float64(loadBufferChecked(fgBuff, x, y, outWidth, outHeight))
 			c = fg.MultF(opacity).Add(c.MultF(1.0 - opacity))
@@ -543,7 +550,7 @@ func approximetlyEqual(a, b float64) bool {
 	return diff < tolerance
 }
 
-func execute(input []byte, colorMode, lcdMode, scale int) ([]byte, error) {
+func execute(input []byte, colorMode, lcdMode, scale int, gbBgColor, gbFgColor FloatColor, gbFgOpacity float64) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(input))
 	if err != nil {
 		return nil, err
@@ -572,13 +579,18 @@ func execute(input []byte, colorMode, lcdMode, scale int) ([]byte, error) {
 	}
 
 	gb := GbDisplayProfile{
-		19.0 / 255.0, 74.0 / 255.0, 7.0 / 255.0,
+		19.0 / 255.0, 74.0 / 255.0, 7.0 / 255.0, 1.0,
 		170.0 / 255.0, 181.0 / 255.0, 19.0 / 255.0,
 	}
 
 	gbp := GbDisplayProfile{
-		0.0 / 255.0, 0.0 / 255.0, 0.0 / 255.0,
+		0.0 / 255.0, 0.0 / 255.0, 0.0 / 255.0, 1.0,
 		164.0 / 255.0, 169.0 / 255.0, 137.0 / 255.0,
+	}
+
+	gbCustom := GbDisplayProfile{
+		gbFgColor.R, gbFgColor.G, gbFgColor.B, gbFgOpacity,
+		gbBgColor.R, gbBgColor.G, gbBgColor.B,
 	}
 
 	// Pokefan531's display profiles
@@ -606,7 +618,7 @@ func execute(input []byte, colorMode, lcdMode, scale int) ([]byte, error) {
 
 	var out image.Image
 
-	if colorMode <= 1 {
+	if colorMode <= 2 {
 		// GB or GBP
 		var prof GbDisplayProfile
 
@@ -615,11 +627,13 @@ func execute(input []byte, colorMode, lcdMode, scale int) ([]byte, error) {
 			prof = gb
 		case 1:
 			prof = gbp
+		case 2:
+			prof = gbCustom
 		}
 
 		out = gbUpscale(img, mult, prof)
 	} else {
-		colorMode -= 2
+		colorMode -= 3
 
 		var prof DisplayProfile
 
@@ -654,6 +668,9 @@ func main() {
 	fileInput := document.Call("getElementById", "fileInput")
 	fileOutput := document.Call("getElementById", "fileOutput")
 	colorMode := document.Call("getElementById", "colorMode")
+	gbFgColor := document.Call("getElementById", "gbCustomFg")
+	gbFgOpacity := document.Call("getElementById", "gbCustomFgOpacity")
+	gbBgColor := document.Call("getElementById", "gbCustomBg")
 	lcdMode := document.Call("getElementById", "lcdMode")
 	scaling := document.Call("getElementById", "scaling")
 	convertButton := document.Call("getElementById", "convertButton")
@@ -669,9 +686,17 @@ func main() {
 			dst := make([]byte, data.Get("length").Int())
 			js.CopyBytesToGo(dst, data)
 
+			gbFgColorHex, _ := strconv.ParseUint(gbFgColor.Get("value").String()[1:], 16, 32)
+			gbFgColorValue := FloatColor{float64(gbFgColorHex>>16) / float64(0xff), float64((gbFgColorHex>>8)&0xff) / float64(0xff), float64(gbFgColorHex&0xff) / float64(0xff)}
+			gbFgOpacityValue, _ := strconv.Atoi(gbFgOpacity.Get("value").String())
+
+			gbBgColorHex, _ := strconv.ParseUint(gbBgColor.Get("value").String()[1:], 16, 32)
+			gbBgColorValue := FloatColor{float64(gbBgColorHex>>16) / float64(0xff), float64((gbBgColorHex>>8)&0xff) / float64(0xff), float64(gbBgColorHex&0xff) / float64(0xff)}
+
 			scaling, _ := strconv.Atoi(scaling.Get("value").String())
 			scaling = min(max(scaling, 1), 8)
-			dst, err := execute(dst, colorMode.Get("selectedIndex").Int(), lcdMode.Get("selectedIndex").Int(), scaling)
+
+			dst, err := execute(dst, colorMode.Get("selectedIndex").Int(), lcdMode.Get("selectedIndex").Int(), scaling, gbBgColorValue, gbFgColorValue, float64(gbFgOpacityValue)/100.0)
 
 			if err == nil {
 				sEnc := b64.StdEncoding.EncodeToString([]byte(dst))
