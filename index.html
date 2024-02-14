@@ -26,12 +26,12 @@
                 var miscParamsClass = document.getElementById('miscParams').classList;
                 var gbCustomFormClass = document.getElementById('gbCustomForm').classList;
 
-                if (index <= 2)  {
+                if (index <= 3)  {
                     miscParamsClass.add('invisible');
                 } else {
                     miscParamsClass.remove('invisible');
                 }
-                if (index != 2)  {
+                if (index != 3)  {
                     gbCustomFormClass.add('invisible');
                 } else {
                     gbCustomFormClass.remove('invisible');
@@ -57,6 +57,7 @@
                     <select id="colorMode" name="colorMode" oninput="updateForm(this.selectedIndex)">
                         <option value="gb">GB</option>
                         <option value="gbp">GBP</option>
+                        <option value="gbl">GBL</option>
                         <option value="gbCustom">GB Custom</option>
                         <option value="gbc">GBC</option>
                         <option value="gba">GBA</option>

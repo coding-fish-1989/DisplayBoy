@@ -588,6 +588,11 @@ func execute(input []byte, colorMode, lcdMode, scale int, gbBgColor, gbFgColor F
 		164.0 / 255.0, 169.0 / 255.0, 137.0 / 255.0,
 	}
 
+	gbl := GbDisplayProfile{
+		0.0 / 255.0, 46.0 / 255.0, 44.0 / 255.0, 1.0,
+		0.0 / 255.0, 181.0 / 255.0, 176.0 / 255.0,
+	}
+
 	gbCustom := GbDisplayProfile{
 		gbFgColor.R, gbFgColor.G, gbFgColor.B, gbFgOpacity,
 		gbBgColor.R, gbBgColor.G, gbBgColor.B,
@@ -618,8 +623,7 @@ func execute(input []byte, colorMode, lcdMode, scale int, gbBgColor, gbFgColor F
 
 	var out image.Image
 
-	if colorMode <= 2 {
-		// GB or GBP
+	if colorMode <= 3 {
 		var prof GbDisplayProfile
 
 		switch colorMode {
@@ -628,12 +632,14 @@ func execute(input []byte, colorMode, lcdMode, scale int, gbBgColor, gbFgColor F
 		case 1:
 			prof = gbp
 		case 2:
+			prof = gbl
+		case 3:
 			prof = gbCustom
 		}
 
 		out = gbUpscale(img, mult, prof)
 	} else {
-		colorMode -= 3
+		colorMode -= 4
 
 		var prof DisplayProfile
 
