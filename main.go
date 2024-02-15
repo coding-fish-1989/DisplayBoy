@@ -526,16 +526,24 @@ func rgbaToLinearColor(r, g, b, a uint32) FloatColor {
 }
 
 func rgbaToGbAlpha(r, g, b, a uint32) float32 {
-	// Luminance (just in case the input isn't GB)
-	gray := (float64(r>>8)/float64(0xff)*0.2126 + float64(g>>8)/float64(0xff)*0.7152 + float64(b>>8)/float64(0xff)*0.0722)
-	// Quantize to 4 shades
-	s := floatToByte(gray)
-	// Custom intensity for each shades
-	if s <= 64 {
+	c := rgbaToLinearColor(r, g, b, a)
+	// Luminance
+	l := c.R*0.2126 + c.G*0.7152 + c.B*0.0722
+	// L*
+	if l <= (216.0 / 24389.0) {
+		l = l * (24389.0 / 27.0)
+	} else {
+		l = math.Pow(l, (1.0/3.0))*116.0 - 16.0
+	}
+	// Normalize to [0,1]
+	l = clamp01(l / 100.0)
+	borderError := 0.03 // To be lenient for some 4 color palette value
+	// Custom intensity for each shade range
+	if l <= 0.25+borderError {
 		return 1.0
-	} else if s <= 128 {
+	} else if l <= 0.5+borderError {
 		return 0.66666667
-	} else if s <= 192 {
+	} else if l <= 0.75+borderError {
 		return 0.33333333
 	}
 	return 0.07
