@@ -529,19 +529,16 @@ func rgbaToGbAlpha(r, g, b, a uint32) float32 {
 	// Luminance (just in case the input isn't GB)
 	gray := (float64(r>>8)/float64(0xff)*0.2126 + float64(g>>8)/float64(0xff)*0.7152 + float64(b>>8)/float64(0xff)*0.0722)
 	// Quantize to 4 shades
-	s := floatToByte(gray) / 64
+	s := floatToByte(gray)
 	// Custom intensity for each shades
-	switch s {
-	case 0:
+	if s <= 64 {
 		return 1.0
-	case 1:
+	} else if s <= 128 {
 		return 0.66666667
-	case 2:
+	} else if s <= 192 {
 		return 0.33333333
-	case 3:
-		return 0.07
 	}
-	return 0
+	return 0.07
 }
 
 func approximetlyEqual(a, b float64) bool {
