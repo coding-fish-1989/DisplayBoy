@@ -283,7 +283,17 @@ func gbUpscale(img image.Image, srcScale int, profile GbDisplayProfile) image.Im
 	for y := 0; y < srcHeight; y += srcScale {
 		row := make([]float32, targetWidth)
 		for x := 0; x < srcWidth; x += srcScale {
-			alpha := rgbaToGbAlpha(img.At(x, y).RGBA())
+			c := rgbaToLinearColor(img.At(x, y).RGBA())
+			l := c.Luminance()
+			// L* conversion
+			if l <= (216.0 / 24389.0) {
+				l = l * (24389.0 / 27.0)
+			} else {
+				l = math.Pow(l, (1.0/3.0))*116.0 - 16.0
+			}
+			// Normalize to [0,1]
+			l /= 100.0
+			alpha := quantizeGb(l)
 			alpha *= float32(fgOpacity)
 			row[x/srcScale] = alpha
 		}
@@ -491,6 +501,10 @@ func (p FloatColor) Gamma() FloatColor {
 	return FloatColor{gamma(p.R), gamma(p.G), gamma(p.B)}
 }
 
+func (p FloatColor) Luminance() float64 {
+	return p.R*0.2126 + p.G*0.7152 + p.B*0.0722
+}
+
 func lerpColor(l, r FloatColor, t float64) FloatColor {
 	return l.Add(r.Sub(l).MultF(t))
 }
@@ -525,18 +539,7 @@ func rgbaToLinearColor(r, g, b, a uint32) FloatColor {
 	return FloatColor{linearTable[r>>8], linearTable[g>>8], linearTable[b>>8]}
 }
 
-func rgbaToGbAlpha(r, g, b, a uint32) float32 {
-	c := rgbaToLinearColor(r, g, b, a)
-	// Luminance
-	l := c.R*0.2126 + c.G*0.7152 + c.B*0.0722
-	// L*
-	if l <= (216.0 / 24389.0) {
-		l = l * (24389.0 / 27.0)
-	} else {
-		l = math.Pow(l, (1.0/3.0))*116.0 - 16.0
-	}
-	// Normalize to [0,1]
-	l = clamp01(l / 100.0)
+func quantizeGb(l float64) float32 {
 	borderError := 0.03 // To be lenient for some 4 color palette value
 	// Custom intensity for each shade range
 	if l <= 0.25+borderError {
