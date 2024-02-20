@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <meta name="description" content="Make GB, GBC and GBA screenshots look closer to the real thing">
+        <meta name="description" content="Convert GB, GBC, and GBA screenshots to look closer to the display on the actual device.">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/x-icon" href="img/favicon.png">
         <link rel="stylesheet" href="css/pico.min.css">
@@ -21,8 +21,9 @@
     margin-right: auto;
 }
         </style>
-        <script type = "text/javascript">
-            function updateForm(index) {
+        <script>
+            function updateForm() {
+                var index = document.getElementById('colorMode').selectedIndex;
                 var miscParamsClass = document.getElementById('miscParams').classList;
                 var gbCustomFormClass = document.getElementById('gbCustomForm').classList;
 
@@ -36,6 +37,9 @@
                 } else {
                     gbCustomFormClass.remove('invisible');
                 }
+
+                document.getElementById('gbCustomFgOpacityDisplay').value = document.getElementById('gbCustomFgOpacity').value
+                document.getElementById('scalingDisplay').value = document.getElementById('scaling').value
             }
         </script>
     </head>
@@ -54,7 +58,7 @@
             </picture>
             <fieldset>
                 <label for="colorMode">Color Mode
-                    <select id="colorMode" name="colorMode" oninput="updateForm(this.selectedIndex)">
+                    <select id="colorMode" name="colorMode" oninput="updateForm()">
                         <option value="gb">GB</option>
                         <option value="gbp">GBP</option>
                         <option value="gbl">GBL</option>
@@ -68,16 +72,16 @@
                 <div id="gbCustomForm" class="grid invisible">
                     <div>
                         <label for="gbCustomBg">Background Color
-                            <input type="color" id="gbCustomBg" name="gbCustomBg" value="#aab513" />
+                            <input type="color" id="gbCustomBg" name="gbCustomBg" value="#aab513">
                         </label>
                     </div>
                     <div>
-                        <label for="gbCustomBg">Foreground Color
-                            <input type="color" id="gbCustomFg" name="gbCustomFg" value="#134a07" />
+                        <label for="gbCustomFg">Foreground Color
+                            <input type="color" id="gbCustomFg" name="gbCustomFg" value="#134a07">
                         </label>
-                        <output style="float:right">100</output>
+                        <output id="gbCustomFgOpacityDisplay" style="float:right">100</output>
                         <label for="gbCustomFgOpacity">Opacity
-                            <input id="gbCustomFgOpacity" name="gbCustomFgOpacity" type="range" min="0" max="100" value="100" oninput="this.parentElement.previousElementSibling.value = this.value">
+                            <input id="gbCustomFgOpacity" name="gbCustomFgOpacity" type="range" min="0" max="100" value="100" oninput="updateForm()">
                         </label>
                     </div>
                 </div>
@@ -89,9 +93,9 @@
                             <option value="off">Off</option>
                         </select>
                     </label>
-                    <output id="scaling-value" style="float:right">5</output>
+                    <output id="scalingDisplay" style="float:right">5</output>
                     <label for="scaling">Scale
-                        <input id="scaling" name="scaling" type="range" min="1" max="8" value="5" oninput="this.parentElement.previousElementSibling.value = this.value">
+                        <input id="scaling" name="scaling" type="range" min="1" max="8" value="5" oninput="updateForm()">
                     </label>
                 </div>
 
@@ -103,6 +107,7 @@
         </main>
         <script src="./wasm_exec.js"></script>
         <script>
+            updateForm();
             const go = new Go();
             WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((result) => {
                 go.run(result.instance);
