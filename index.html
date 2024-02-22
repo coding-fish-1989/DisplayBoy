@@ -2,14 +2,21 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <meta name="description" content="Convert GB, GBC, and GBA screenshots to look closer to the display on the actual device.">
+        <meta name="description" content="Convert GB, GBC, and GBA screenshots to resemble the display of the actual device more closely.">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" type="image/x-icon" href="img/favicon.png">
         <link rel="stylesheet" href="css/pico.min.css">
-        <title>DisplayBoy</title>
+        <title>DisplayBoy: GB, GBC, and GBA Display Filter</title>
         <style>
+.logoHeader {
+    margin: 0px;
+}
 .logo {
     margin-left: -10px;
+}
+hr {
+    margin-top: 30px;
+    margin-bottom: 30px;
 }
 .invisible {
     display:none;
@@ -50,13 +57,21 @@
                     <li><a href="https://github.com/coding-fish-1989/DisplayBoy/blob/main/ATTRIBUTIONS.md" target="_blank">Attributions</a></li>
                 </ul>
             </nav>
-            <picture>
-                <source srcset="img/db_logo_light_1x.png 1x, img/db_logo_light_2x.png 2x" media="screen and (prefers-color-scheme: light)">
-                <source srcset="img/db_logo_dark_1x.png 1x, img/db_logo_dark_2x.png 2x" media="screen and (prefers-color-scheme: dark)">
-                <img src="img/db_logo_light_1x.png" alt="DisplayBoy Logo" class="logo">
-            </picture>
-            <p>Convert GB, GBC, and GBA screenshots to look closer to the display on the actual device.</p>
+            <h1 class="logoHeader">
+                <picture>
+                    <a href="./">
+                        <source srcset="img/db_logo_light_1x.png 1x, img/db_logo_light_2x.png 2x" media="screen and (prefers-color-scheme: light)">
+                        <source srcset="img/db_logo_dark_1x.png 1x, img/db_logo_dark_2x.png 2x" media="screen and (prefers-color-scheme: dark)">
+                        <img src="img/db_logo_light_1x.png" alt="DisplayBoy" class="logo">
+                    </a>
+                </picture>
+            </h1>
+            <p class="description">Convert GB, GBC, and GBA screenshots to resemble the display of the actual device more closely.</p>
+            <hr>
             <fieldset>
+                <label for="fileInput">Select Image
+                    <input type="file" id="fileInput" accept=".png,.jpg,.jpeg">
+                </label>
                 <label for="colorMode">Color Mode
                     <select id="colorMode" name="colorMode" oninput="updateForm()">
                         <option value="gb">GB</option>
@@ -99,8 +114,7 @@
                     </label>
                 </div>
 
-                <input type="file" id="fileInput">
-                <button type="button" id="convertButton">Go</button>
+                <button type="button" id="convertButton">Convert</button>
                 <small id="convError" style="color:red"></small>
             </fieldset>
             <img id="fileOutput" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Filtered Image">
