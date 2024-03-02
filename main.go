@@ -259,6 +259,25 @@ func allocateAlphaBuff(width, height int) [][]float32 {
 	return buff
 }
 
+func bilinearScale(fromWidth, fromHeight, toWidth, toHeight int, fromBuff, toBuff [][]float32) {
+	xRatio := float32(fromWidth) / float32(toWidth)
+	yRatio := float32(fromHeight) / float32(toHeight)
+	for y := 0; y < toHeight; y++ {
+		for x := 0; x < toWidth; x++ {
+			xf := float32(x) * xRatio
+			yf := float32(y) * yRatio
+			xi := int(xf)
+			yi := int(yf)
+			xf -= float32(xi)
+			yf -= float32(yi)
+			toBuff[y][x] = (1.0-xf)*(1.0-yf)*loadBufferChecked(fromBuff, xi, yi, fromWidth, fromHeight) +
+				xf*(1.0-yf)*loadBufferChecked(fromBuff, xi+1, yi, fromWidth, fromHeight) +
+				(1.0-xf)*yf*loadBufferChecked(fromBuff, xi, yi+1, fromWidth, fromHeight) +
+				xf*yf*loadBufferChecked(fromBuff, xi+1, yi+1, fromWidth, fromHeight)
+		}
+	}
+}
+
 type GbDisplayProfile struct {
 	ForegroundR, ForegroundG, ForegroundB, ForegroundA float64
 	BackgroundR, BackgroundG, BackgroundB              float64
@@ -364,41 +383,55 @@ func gbUpscale(img image.Image, srcScale int, profile GbDisplayProfile) image.Im
 	// Gaussian blur result from above is now kept as a foreground buffer
 	fgBuff := bgPingBuff
 
-	// Create a new buffer for shadow pass
+	// Allocate a new buffer for ping buffer, since it's been used for foreground buffer
 	bgPingBuff = allocateAlphaBuff(outWidth, outHeight)
 
-	// Apply larger blur for shadowing
+	// Apply larger blur for shadowing:
+	// - Downsamples the foreground buffer to approximetely half the size
+	// - Applies separable gaussian blur
+	// - Upsamples the buffer back to original size
+	// This is done to avoid using massive gaussian blur kernel.
+
+	// Half the size, but round up. This is to avoid losing pixel data.
+	outWidthSmall := (outWidth + 1) / 2
+	outHeightSmall := (outHeight + 1) / 2
+
+	// Downsample
+	bilinearScale(outWidth, outHeight, outWidthSmall, outHeightSmall, fgBuff, bgPingBuff)
+
 	{
 		// Gaussian kernel
 		var kernel = [...]float32{0.006, 0.061, 0.241, 0.383}
 
 		// Horizontal gaussian blur pass
 		// It takes in blurred foreground buffer as an input to slightly increase the blur radius
-		for y := 0; y < outHeight; y++ {
-			for x := 0; x < outWidth; x++ {
+		for y := 0; y < outHeightSmall; y++ {
+			for x := 0; x < outWidthSmall; x++ {
 				g := float32(0)
-				g += loadBufferChecked(fgBuff, x-3, y, outWidth, outHeight) * kernel[0]
-				g += loadBufferChecked(fgBuff, x-2, y, outWidth, outHeight) * kernel[1]
-				g += loadBufferChecked(fgBuff, x-1, y, outWidth, outHeight) * kernel[2]
-				g += loadBufferChecked(fgBuff, x+0, y, outWidth, outHeight) * kernel[3]
-				g += loadBufferChecked(fgBuff, x+1, y, outWidth, outHeight) * kernel[2]
-				g += loadBufferChecked(fgBuff, x+2, y, outWidth, outHeight) * kernel[1]
-				g += loadBufferChecked(fgBuff, x+3, y, outWidth, outHeight) * kernel[0]
-				bgPingBuff[y][x] = g
+				g += loadBufferChecked(bgPingBuff, x-3, y, outWidthSmall, outHeightSmall) * kernel[0]
+				g += loadBufferChecked(bgPingBuff, x-2, y, outWidthSmall, outHeightSmall) * kernel[1]
+				g += loadBufferChecked(bgPingBuff, x-1, y, outWidthSmall, outHeightSmall) * kernel[2]
+				g += loadBufferChecked(bgPingBuff, x+0, y, outWidthSmall, outHeightSmall) * kernel[3]
+				g += loadBufferChecked(bgPingBuff, x+1, y, outWidthSmall, outHeightSmall) * kernel[2]
+				g += loadBufferChecked(bgPingBuff, x+2, y, outWidthSmall, outHeightSmall) * kernel[1]
+				g += loadBufferChecked(bgPingBuff, x+3, y, outWidthSmall, outHeightSmall) * kernel[0]
+				bgPongBuff[y][x] = g
 			}
 		}
 
+		bgPingBuff, bgPongBuff = bgPongBuff, bgPingBuff
+
 		// Vertical gaussian blur pass
-		for y := 0; y < outHeight; y++ {
-			for x := 0; x < outWidth; x++ {
+		for y := 0; y < outHeightSmall; y++ {
+			for x := 0; x < outWidthSmall; x++ {
 				g := float32(0)
-				g += loadBufferChecked(bgPingBuff, x, y-3, outWidth, outHeight) * kernel[0]
-				g += loadBufferChecked(bgPingBuff, x, y-2, outWidth, outHeight) * kernel[1]
-				g += loadBufferChecked(bgPingBuff, x, y-1, outWidth, outHeight) * kernel[2]
-				g += loadBufferChecked(bgPingBuff, x, y+0, outWidth, outHeight) * kernel[3]
-				g += loadBufferChecked(bgPingBuff, x, y+1, outWidth, outHeight) * kernel[2]
-				g += loadBufferChecked(bgPingBuff, x, y+2, outWidth, outHeight) * kernel[1]
-				g += loadBufferChecked(bgPingBuff, x, y+3, outWidth, outHeight) * kernel[0]
+				g += loadBufferChecked(bgPingBuff, x, y-3, outWidthSmall, outHeightSmall) * kernel[0]
+				g += loadBufferChecked(bgPingBuff, x, y-2, outWidthSmall, outHeightSmall) * kernel[1]
+				g += loadBufferChecked(bgPingBuff, x, y-1, outWidthSmall, outHeightSmall) * kernel[2]
+				g += loadBufferChecked(bgPingBuff, x, y+0, outWidthSmall, outHeightSmall) * kernel[3]
+				g += loadBufferChecked(bgPingBuff, x, y+1, outWidthSmall, outHeightSmall) * kernel[2]
+				g += loadBufferChecked(bgPingBuff, x, y+2, outWidthSmall, outHeightSmall) * kernel[1]
+				g += loadBufferChecked(bgPingBuff, x, y+3, outWidthSmall, outHeightSmall) * kernel[0]
 				bgPongBuff[y][x] = g
 			}
 		}
@@ -406,7 +439,14 @@ func gbUpscale(img image.Image, srcScale int, profile GbDisplayProfile) image.Im
 		bgPingBuff, bgPongBuff = bgPongBuff, bgPingBuff
 	}
 
-	bgShadowBuff := bgPingBuff
+	// Upsample
+	bilinearScale(outWidthSmall, outHeightSmall, outWidth, outHeight, bgPingBuff, bgPongBuff)
+
+	bgShadowBuff := bgPongBuff
+
+	// Invalidate temporary buffers
+	bgPingBuff = nil
+	bgPongBuff = nil
 
 	shadowOpacity := 0.5
 	shadowOffset := 1
