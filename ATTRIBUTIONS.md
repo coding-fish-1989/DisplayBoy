@@ -25,6 +25,26 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+CRT-interlaced
+---
+
+Copyright (C) 2010-2012 cgwg, Themaister and DOLLS
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
+
+(cgwg gave their consent to have the original version of this shader
+distributed under the GPL in this message:
+
+      http://board.byuu.org/viewtopic.php?p=26075#p26075
+
+      "Feel free to distribute my shaders under the GPL. After all, the
+      barrel distortion code was taken from the Curvature shader, which is
+      under the GPL."
+)
+
 wasm_exec.js
 ---
 Copyright (c) 2009 The Go Authors. All rights reserved.

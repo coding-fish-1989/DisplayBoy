@@ -33,7 +33,7 @@ hr {
                 var miscParamsClass = document.getElementById('miscParams').classList;
                 var gbCustomFormClass = document.getElementById('gbCustomForm').classList;
 
-                if (index <= 3)  {
+                if (index <= 3 || index == 8)  {
                     miscParamsClass.add('invisible');
                 } else {
                     miscParamsClass.remove('invisible');
@@ -80,6 +80,7 @@ hr {
                         <option value="gba">GBA</option>
                         <option value="gbaSp">GBA SP</option>
                         <option value="gbaSpWhite">GBA SP White</option>
+                        <option value="crt">CRT</option>
                     </select>
                 </label>
                 <div id="gbCustomForm" class="grid invisible">
