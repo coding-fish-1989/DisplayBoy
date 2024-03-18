@@ -118,13 +118,9 @@ hr {
             </fieldset>
             <img id="fileOutput" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Filtered Image">
         </main>
-        <script src="./wasm_exec.js"></script>
         <script>
             updateForm();
-            const go = new Go();
-            WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((result) => {
-                go.run(result.instance);
-            });
         </script>
+      <script src="./bootstrap.js"></script>
     </body>
 </html>

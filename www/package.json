@@ -1,0 +1,42 @@
+{
+  "name": "display-boy-app",
+  "version": "1.0.0",
+  "description": "Convert GB, GBC, and GBA screenshots to resemble the display of the actual device more closely.",
+  "main": "index.js",
+  "scripts": {
+    "build": "webpack --config webpack.config.js",
+    "start": "webpack-dev-server"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coding-fish-1989/DisplayBoy"
+  },
+  "keywords": [
+    "gb",
+    "gbc",
+    "gba",
+    "crt",
+    "screenshot",
+    "filter",
+    "analogue-pocket",
+    "webassembly",
+    "wasm",
+    "rust",
+    "webpack"
+  ],
+  "author": "Coding Fish <154895466+coding-fish-1989@users.noreply.github.com>",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/coding-fish-1989/DisplayBoy/issues"
+  },
+  "homepage": "https://coding-fish-1989.github.io/displayboy/",
+  "dependencies": {
+    "display-boy": "file:../pkg"
+  },
+  "devDependencies": {
+    "webpack": "^4.29.3",
+    "webpack-cli": "^3.1.0",
+    "webpack-dev-server": "^3.1.5",
+    "copy-webpack-plugin": "^5.0.0"
+  }
+}

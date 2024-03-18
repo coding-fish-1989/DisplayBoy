@@ -1,0 +1,22 @@
+[package]
+name = "display-boy"
+version = "1.0.0"
+authors = ["Coding Fish <154895466+coding-fish-1989@users.noreply.github.com>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+wasm-bindgen = "0.2.84"
+
+console_error_panic_hook = { version = "0.1.7", optional = true }
+image = "0.25.0"
+base64 = "0.22.0"
+fast-math = "0.1.1"
+
+[profile.release]
+opt-level = 3
