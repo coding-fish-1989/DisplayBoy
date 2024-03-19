@@ -1,20 +1,20 @@
 /*
-	DisplayBoy
+    DisplayBoy
 
-	Copyright (C) 2024 coding-fish-1989
+    Copyright (C) 2024 coding-fish-1989
 
-	This program is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or
-	(at your option) any later version.
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 use crate::shader_support;
@@ -72,28 +72,15 @@ fn color_correct(c: Rgb<f32>, p: &DisplayProfile) -> Rgb<f32> {
 
 pub fn color_gb(
     img: RgbaImage,
-    src_scale: u32,
+    src_scale: f32,
     scale: u32,
     lcd_mode: u32,
     prof: &DisplayProfile,
 ) -> RgbaImage {
-    let src_width = img.width();
-    let src_height = img.height();
+	let src_img = prepare_src_image(img, src_scale);
 
-    let (target_width, target_height) =
-        calculate_scaled_buffer_size(src_width, src_height, src_scale);
-    let mut buff = FloatImage::new(target_width, target_height);
-
-    for y in 0..target_height {
-        for x in 0..target_width {
-            let p = img.get_pixel(x as u32 * src_scale, y as u32 * src_scale);
-            let p = rgba_u8_to_rgb_f32(*p).to_linear();
-            buff.put_pixel(x, y, p);
-        }
-    }
-
-    let src_width = target_width;
-    let src_height = target_height;
+    let src_width = src_img.width();
+    let src_height = src_img.height();
     let width = src_width * scale;
     let height = src_height * scale;
 
@@ -102,16 +89,16 @@ pub fn color_gb(
 
     let point_sample_buff = |x: f32, y: f32| -> Rgb<f32> {
         let x = ((x * src_width_f).floor() as i32)
-            .min(target_width as i32 - 1)
+            .min(src_width as i32 - 1)
             .max(0) as u32;
         let y = ((y * src_height_f).floor() as i32)
-            .min(target_height as i32 - 1)
+            .min(src_height as i32 - 1)
             .max(0) as u32;
-        *buff.get_pixel(x, y)
+        *src_img.get_pixel(x, y)
     };
 
     let load_buff = |x: i32, y: i32| -> Rgb<f32> {
-        *buff.get_pixel(
+        *src_img.get_pixel(
             x.min(src_width as i32 - 1).max(0) as u32,
             y.min(src_height as i32 - 1).max(0) as u32,
         )

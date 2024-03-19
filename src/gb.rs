@@ -109,7 +109,7 @@ pub struct GbDisplayProfile {
     pub background_b: f32,
 }
 
-pub fn gb_mono(img: RgbaImage, src_scale: u32, profile: GbDisplayProfile) -> RgbaImage {
+pub fn gb_mono(img: RgbaImage, src_scale: f32, profile: GbDisplayProfile) -> RgbaImage {
     let src_width = img.width();
     let src_height = img.height();
 
@@ -134,9 +134,16 @@ pub fn gb_mono(img: RgbaImage, src_scale: u32, profile: GbDisplayProfile) -> Rgb
 
     // Quantize to alpha, downscale to real device resolution, and store
     let mut buff = AlphaImage::new(target_width, target_height);
+    let x_target_half_texel = 1.0 / (target_width as f32 * 2.0);
+    let y_target_half_texel = 1.0 / (target_height as f32 * 2.0);
     for y in 0..target_height {
         for x in 0..target_width {
-            let c = img.get_pixel(x * src_scale, y * src_scale);
+            // Nearest neighbor downscale
+            let x_coord = x as f32 / target_width as f32 + x_target_half_texel;
+            let y_coord = y as f32 / target_height as f32 + y_target_half_texel;
+            let x_src = (x_coord * src_width as f32).floor() as u32;
+            let y_src = (y_coord * src_height as f32).floor() as u32;
+            let c = img.get_pixel(x_src, y_src);
             let c = rgba_u8_to_rgb_f32(*c).to_linear();
             let l = c.luminance();
             let l = if l <= (216.0 / 24389.0) {

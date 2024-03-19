@@ -1,20 +1,20 @@
 /*
-	DisplayBoy
+    DisplayBoy
 
-	Copyright (C) 2024 coding-fish-1989
+    Copyright (C) 2024 coding-fish-1989
 
-	This program is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or
-	(at your option) any later version.
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 /*
@@ -89,7 +89,7 @@ pub fn crt_inv_gamma(col: Rgb<f32>) -> Rgb<f32> {
     )
 }
 
-pub fn crt(img: RgbaImage, src_scale: u32, scale: u32) -> RgbaImage {
+pub fn crt(img: RgbaImage, src_scale: f32, scale: u32) -> RgbaImage {
     let load_buff = |x: i32, y: i32| -> Rgb<f32> {
         if y < 0 || y >= img.height() as i32 || x < 0 || x >= img.width() as i32 {
             return Rgb([0.0, 0.0, 0.0]);
@@ -110,7 +110,7 @@ pub fn crt(img: RgbaImage, src_scale: u32, scale: u32) -> RgbaImage {
         src_height = 240;
     }
 
-    let scaled_margin = CRT_MARGIN * src_scale;
+    let scaled_margin = (CRT_MARGIN as f32 * src_scale).ceil() as u32;
     top_margin += scaled_margin;
     let left_margin = scaled_margin;
     let src_height = src_height + scaled_margin * 2;
@@ -121,11 +121,16 @@ pub fn crt(img: RgbaImage, src_scale: u32, scale: u32) -> RgbaImage {
 
     let mut buff = FloatImage::new(target_width, target_height);
 
+    let x_target_half_texel = 1.0 / (target_width as f32 * 2.0);
+    let y_target_half_texel = 1.0 / (target_height as f32 * 2.0);
     for y in 0..target_height {
         for x in 0..target_width {
-            let src_x = (x * src_scale) as i32 - left_margin as i32;
-            let src_y = (y * src_scale) as i32 - top_margin as i32;
-            buff.put_pixel(x, y, load_buff(src_x, src_y).to_linear());
+            // Nearest neighbor downscale
+            let x_coord = x as f32 / target_width as f32 + x_target_half_texel;
+            let y_coord = y as f32 / target_height as f32 + y_target_half_texel;
+            let x_src = (x_coord * src_width as f32).floor() as i32 - left_margin as i32;
+            let y_src = (y_coord * src_height as f32).floor() as i32 - top_margin as i32;
+            buff.put_pixel(x, y, load_buff(x_src, y_src).to_linear());
         }
     }
 
@@ -230,11 +235,14 @@ pub fn crt(img: RgbaImage, src_scale: u32, scale: u32) -> RgbaImage {
 
             uv_ratio_y = uv_ratio_y + 1.0 / 3.0 * filter as f32;
             let weights = weights.add(scanline_weights(uv_ratio_y, wid)).div_f(3.0);
-            let weights2 = weights2.add(scanline_weights(1.0 - uv_ratio_y, wid2)).div_f(3.0);
+            let weights2 = weights2
+                .add(scanline_weights(1.0 - uv_ratio_y, wid2))
+                .div_f(3.0);
 
             uv_ratio_y = uv_ratio_y - 2.0 / 3.0 * filter as f32;
             let weights = weights.add(scanline_weights(uv_ratio_y.abs(), wid).div_f(3.0));
-            let weights2 = weights2.add(scanline_weights((1.0 - uv_ratio_y).abs(), wid2).div_f(3.0));
+            let weights2 =
+                weights2.add(scanline_weights((1.0 - uv_ratio_y).abs(), wid2).div_f(3.0));
 
             let color = col.mult(weights).add(col2.mult(weights2));
 

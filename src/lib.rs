@@ -33,17 +33,17 @@ extern "C" {
     fn alert(s: &str);
 }
 
-pub fn detect_src_scale(width: u32, height: u32) -> u32 {
+pub fn detect_src_scale(width: u32, height: u32) -> f32 {
 	// Detect device type from aspect ratio
 	// The derived screen dimension is used to find out source scaling multiplier
 	// This is needed because some apps integer scale screenshots on export
-    if ((width as f64 / height as f64) - 1.5).abs() < 0.0000000000001 {
-        return width / 240;
+    if ((width as f64 / height as f64) - 1.5).abs() < 0.01 {
+        return width as f32 / 240.0;
     }
-    if ((width as f64 / height as f64) - 1.11111111111111111111).abs() < 0.0000000000001 {
-        return width / 160;
+    if ((width as f64 / height as f64) - 1.11111111111111111111).abs() < 0.01 {
+        return width as f32 / 160.0;
     }
-    return 1;
+    return 1.0;
 }
 
 #[wasm_bindgen(js_name = processImageGb)]
@@ -90,7 +90,6 @@ pub fn process_image_gb(mode: i32, data: Vec<u8>) -> String {
     };
 
     let src_scale = detect_src_scale(img.width(), img.height());
-
     let result = gb::gb_mono(img.into_rgba8(), src_scale, prof);
 
     let mut buf = Vec::new();
