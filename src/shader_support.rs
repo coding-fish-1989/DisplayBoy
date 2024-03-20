@@ -196,9 +196,9 @@ fn conservative_ceil_to_u32(v: f32) -> u32 {
 }
 
 #[inline(always)]
-pub fn calculate_scaled_buffer_size(width: u32, height: u32, scale: f32) -> (u32, u32) {
-    let width = conservative_ceil_to_u32(width as f32 / scale as f32);
-    let height = conservative_ceil_to_u32(height as f32 / scale as f32);
+pub fn calculate_scaled_buffer_size(width: u32, height: u32, scale: (f32, f32)) -> (u32, u32) {
+    let width = conservative_ceil_to_u32(width as f32 / scale.0 as f32);
+    let height = conservative_ceil_to_u32(height as f32 / scale.1 as f32);
     (width, height)
 }
 
@@ -231,7 +231,7 @@ pub fn rgba_u8_to_rgb_f32(rgb: Rgba<u8>) -> Rgb<f32> {
     ])
 }
 
-pub fn prepare_src_image(img: RgbaImage, src_scale: f32) -> FloatImage {
+pub fn prepare_src_image(img: RgbaImage, src_scale: (f32, f32)) -> FloatImage {
     let src_width = img.width();
     let src_height = img.height();
 

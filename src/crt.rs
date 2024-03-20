@@ -134,7 +134,7 @@ fn apply_lut_rgb3d(col: Rgba<f32>, lut: &[Rgb<f32>; 32 * 32 * 32]) -> Rgb<f32> {
     lerp_color(c0, c1, dz)
 }
 
-pub fn crt(img: RgbaImage, src_scale: f32, scale: u32) -> RgbaImage {
+pub fn crt(img: RgbaImage, src_scale: (f32, f32), scale: u32) -> RgbaImage {
     let lut_png = include_bytes!("crt_lut.png");
     let lut_img = image::load_from_memory(lut_png).unwrap().to_rgba8();
     let mut lut = [Rgb::<f32>([0.0, 0.0, 0.0]); 32 * 32 * 32];
@@ -146,7 +146,8 @@ pub fn crt(img: RgbaImage, src_scale: f32, scale: u32) -> RgbaImage {
                     p[0] as f32 / 255.0,
                     p[1] as f32 / 255.0,
                     p[2] as f32 / 255.0,
-                ]).to_linear_from_gamma(CRT_GAMMA);
+                ])
+                .to_linear_from_gamma(CRT_GAMMA);
             }
         }
     }
@@ -165,47 +166,42 @@ pub fn crt(img: RgbaImage, src_scale: f32, scale: u32) -> RgbaImage {
         apply_lut_rgb3d(p, &lut)
     };
 
-    let (src_width, mut src_height) = (img.width(), img.height());
-
-    let mut top_margin = 0;
-    if src_height < 240 && src_height >= 224 {
-        top_margin = (240 - src_height) / 2;
-        src_height = 240;
-    }
-
-    let scaled_margin = (CRT_MARGIN as f32 * src_scale).ceil() as u32;
-    top_margin += scaled_margin;
-    let left_margin = scaled_margin;
-    let src_height = src_height + scaled_margin * 2;
-    let src_width = src_width + scaled_margin * 2;
+    let (src_width, src_height) = (img.width(), img.height());
 
     let (target_width, target_height) =
         calculate_scaled_buffer_size(src_width, src_height, src_scale);
 
-    let mut buff = FloatImage::new(target_width, target_height);
+    let mut top_margin = CRT_MARGIN;
+    if target_height < 240 && target_height >= 224 {
+        top_margin += (240 - target_height) / 2;
+    }
 
+    // Create a source buffer with margins
+    let (buff_width, buff_height) = (
+        target_width + CRT_MARGIN * 2,
+        target_height + top_margin * 2,
+    );
+    let mut buff = FloatImage::new(buff_width, buff_height);
+
+    // Note that target_width and target_height are being used to scale here on purpose.
+    // buff_width and buff_height are only the size of the output buffer, and does not affect the nearest neighbor scaling.
     let x_target_half_texel = 1.0 / (target_width as f32 * 2.0);
     let y_target_half_texel = 1.0 / (target_height as f32 * 2.0);
-    for y in 0..target_height {
-        for x in 0..target_width {
+    for y in 0..buff_height {
+        for x in 0..buff_width {
             // Nearest neighbor downscale
-            let x_coord = x as f32 / target_width as f32 + x_target_half_texel;
-            let y_coord = y as f32 / target_height as f32 + y_target_half_texel;
-            let x_src = (x_coord * src_width as f32).floor() as i32 - left_margin as i32;
-            let y_src = (y_coord * src_height as f32).floor() as i32 - top_margin as i32;
-            buff.put_pixel(
-                x,
-                y,
-                load_buff(x_src, y_src),
-            );
+            let x_coord =
+                (x as i32 - CRT_MARGIN as i32) as f32 / target_width as f32 + x_target_half_texel;
+            let y_coord =
+                (y as i32 - top_margin as i32) as f32 / target_height as f32 + y_target_half_texel;
+            let x_src = (x_coord * src_width as f32).floor() as i32;
+            let y_src = (y_coord * src_height as f32).floor() as i32;
+            buff.put_pixel(x, y, load_buff(x_src, y_src));
         }
     }
 
-    let src_width = target_width;
-    let src_height = target_height;
-
-    let width = src_width * scale;
-    let height = src_height * scale;
+    let (src_width, src_height) = (buff_width, buff_height);
+    let (width, height) = (src_width * scale, src_height * scale);
 
     let src_width_f = src_width as f32;
     let src_height_f = src_height as f32;

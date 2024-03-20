@@ -109,7 +109,7 @@ pub struct GbDisplayProfile {
     pub background_b: f32,
 }
 
-pub fn gb_mono(img: RgbaImage, src_scale: f32, profile: GbDisplayProfile) -> RgbaImage {
+pub fn gb_mono(img: RgbaImage, src_scale: (f32, f32), profile: GbDisplayProfile) -> RgbaImage {
     let src_width = img.width();
     let src_height = img.height();
 

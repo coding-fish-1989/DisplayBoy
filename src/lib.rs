@@ -33,17 +33,39 @@ extern "C" {
     fn alert(s: &str);
 }
 
-pub fn detect_src_scale(width: u32, height: u32) -> f32 {
+pub fn detect_src_scale(width: u32, height: u32) -> (f32, f32) {
 	// Detect device type from aspect ratio
 	// The derived screen dimension is used to find out source scaling multiplier
 	// This is needed because some apps integer scale screenshots on export
-    if ((width as f64 / height as f64) - 1.5).abs() < 0.01 {
-        return width as f32 / 240.0;
+    let aspect_ratio = width as f32 / height as f32;
+    if (aspect_ratio - (240.0 / 160.0)).abs() < 0.01 {
+        // GBA
+        let scale = width as f32 / 240.0;
+        (scale, scale)
+    } else if (aspect_ratio - (160.0 / 144.0)).abs() < 0.01 {
+        // GBC
+        let scale = width as f32 / 160.0;
+        (scale, scale)
+    } else if (aspect_ratio - (256.0 / 224.0)).abs() < 0.01 ||
+              (aspect_ratio - (256.0 / 240.0)).abs() < 0.01 {
+        // Probably SNES or NES - raw resolution
+        let scale = width as f32 / 256.0;
+        (scale, scale)
+    } else if (aspect_ratio - (64.0 / 49.0)).abs() < 0.01 ||
+              (aspect_ratio - (8.0 / 7.0)).abs() < 0.01 {
+        // Probably upscaled CRT with height of 224
+        (width as f32 / 256.0, height as f32 / 224.0)
+    } else if (aspect_ratio - (128.0 / 105.0)).abs() < 0.01 ||
+              (aspect_ratio - (16.0 / 15.0)).abs() < 0.01 {
+        // Probably upscaled CRT with height of 240
+        (width as f32 / 256.0, height as f32 / 240.0)
+    } else if width == 512 && (height == 240 || height == 224) {
+        // agg23's SNES core support
+        // https://github.com/agg23/openfpga-SNES/blob/master/dist/Cores/agg23.SNES/video.json
+        (2.0, 1.0)
+    } else {
+        (1.0, 1.0)
     }
-    if ((width as f64 / height as f64) - 1.11111111111111111111).abs() < 0.01 {
-        return width as f32 / 160.0;
-    }
-    return 1.0;
 }
 
 #[wasm_bindgen(js_name = processImageGb)]

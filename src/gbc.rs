@@ -72,7 +72,7 @@ fn color_correct(c: Rgb<f32>, p: &DisplayProfile) -> Rgb<f32> {
 
 pub fn color_gb(
     img: RgbaImage,
-    src_scale: f32,
+    src_scale: (f32, f32),
     scale: u32,
     lcd_mode: u32,
     prof: &DisplayProfile,
