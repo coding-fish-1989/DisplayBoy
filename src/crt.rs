@@ -53,7 +53,7 @@ pub const CRT_MARGIN: u32 = 4;
 pub const CRT_SCANLINE_WEIGHT: f32 = 0.3;
 pub const CRT_LUM: f32 = 0.0;
 pub const CRT_DOT_MASK: f32 = 0.05;
-pub const CRT_GAMMA: f32 = 2.4;
+pub const CRT_GAMMA: f32 = 2.5;
 pub const CRT_LANCZOS_SIZE: i32 = 2;
 
 pub const CRT_PWR: f32 =
@@ -89,17 +89,80 @@ pub fn crt_inv_gamma(col: Rgb<f32>) -> Rgb<f32> {
     )
 }
 
+#[inline(always)]
+fn apply_lut_rgb3d(col: Rgba<f32>, lut: &[Rgb<f32>; 32 * 32 * 32]) -> Rgb<f32> {
+    let r = col[0];
+    let g = col[1];
+    let b = col[2];
+
+    let x = (r * 31.0).floor() as usize;
+    let y = (g * 31.0).floor() as usize;
+    let z = (b * 31.0).floor() as usize;
+
+    let dx = r * 31.0 - x as f32;
+    let dy = g * 31.0 - y as f32;
+    let dz = b * 31.0 - z as f32;
+
+    let x_next = (x + 1).min(31);
+    let y_next = (y + 1).min(31);
+    let z_next = (z + 1).min(31);
+
+    let c00 = lerp_color(
+        lut[x + y * 32 + z * 32 * 32],
+        lut[x_next + y * 32 + z * 32 * 32],
+        dx,
+    );
+    let c01 = lerp_color(
+        lut[x + y * 32 + z_next * 32 * 32],
+        lut[x_next + y * 32 + z_next * 32 * 32],
+        dx,
+    );
+    let c10 = lerp_color(
+        lut[x + y_next * 32 + z * 32 * 32],
+        lut[x_next + y_next * 32 + z * 32 * 32],
+        dx,
+    );
+    let c11 = lerp_color(
+        lut[x + y_next * 32 + z_next * 32 * 32],
+        lut[x_next + y_next * 32 + z_next * 32 * 32],
+        dx,
+    );
+
+    let c0 = lerp_color(c00, c10, dy);
+    let c1 = lerp_color(c01, c11, dy);
+
+    lerp_color(c0, c1, dz)
+}
+
 pub fn crt(img: RgbaImage, src_scale: f32, scale: u32) -> RgbaImage {
+    let lut_png = include_bytes!("crt_lut.png");
+    let lut_img = image::load_from_memory(lut_png).unwrap().to_rgba8();
+    let mut lut = [Rgb::<f32>([0.0, 0.0, 0.0]); 32 * 32 * 32];
+    for z in 0..32 {
+        for y in 0..32 {
+            for x in 0..32 {
+                let p = lut_img.get_pixel((x + z * 32) as u32, y as u32);
+                lut[x + y * 32 + z * 32 * 32] = Rgb::<f32>([
+                    p[0] as f32 / 255.0,
+                    p[1] as f32 / 255.0,
+                    p[2] as f32 / 255.0,
+                ]).to_linear_from_gamma(CRT_GAMMA);
+            }
+        }
+    }
+
     let load_buff = |x: i32, y: i32| -> Rgb<f32> {
         if y < 0 || y >= img.height() as i32 || x < 0 || x >= img.width() as i32 {
             return Rgb([0.0, 0.0, 0.0]);
         }
         let p = img.get_pixel(x as u32, y as u32);
-        Rgb::<f32>([
+        let p = Rgba::<f32>([
             p[0] as f32 / 255.0,
             p[1] as f32 / 255.0,
             p[2] as f32 / 255.0,
-        ])
+            1.0,
+        ]);
+        apply_lut_rgb3d(p, &lut)
     };
 
     let (src_width, mut src_height) = (img.width(), img.height());
@@ -130,7 +193,11 @@ pub fn crt(img: RgbaImage, src_scale: f32, scale: u32) -> RgbaImage {
             let y_coord = y as f32 / target_height as f32 + y_target_half_texel;
             let x_src = (x_coord * src_width as f32).floor() as i32 - left_margin as i32;
             let y_src = (y_coord * src_height as f32).floor() as i32 - top_margin as i32;
-            buff.put_pixel(x, y, load_buff(x_src, y_src).to_linear());
+            buff.put_pixel(
+                x,
+                y,
+                load_buff(x_src, y_src),
+            );
         }
     }
 

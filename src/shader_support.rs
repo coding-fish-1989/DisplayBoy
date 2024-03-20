@@ -39,6 +39,7 @@ pub fn to_gamma(v: f32) -> f32 {
 
 pub trait ShaderSupport {
     fn to_linear(&self) -> Self;
+    fn to_linear_from_gamma(&self, gamma: f32) -> Self;
     fn to_gamma(&self) -> Self;
     fn add(&self, rhs: Self) -> Self;
     fn add_f(&self, rhs: f32) -> Self;
@@ -62,6 +63,15 @@ impl ShaderSupport for Rgb<f32> {
     #[inline(always)]
     fn to_linear(&self) -> Self {
         Self([to_linear(self[0]), to_linear(self[1]), to_linear(self[2])])
+    }
+
+    #[inline(always)]
+    fn to_linear_from_gamma(&self, gamma: f32) -> Self {
+        Self([
+            self[0].powf(gamma),
+            self[1].powf(gamma),
+            self[2].powf(gamma),
+        ])
     }
 
     #[inline(always)]
