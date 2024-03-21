@@ -49,7 +49,9 @@ pub fn detect_src_scale(width: u32, height: u32) -> ScaleInfo {
         // https://github.com/agg23/openfpga-SNES/blob/master/dist/Cores/agg23.SNES/video.json
         ScaleInfo { scale_x: 2.0, scale_y: 1.0, respect_input_aspect_ratio: false }
     } else {
-        ScaleInfo { scale_x: 1.0, scale_y: 1.0, respect_input_aspect_ratio: false }
+        // Fallback to 240p
+        let scale = height as f32 / 240.0;
+        ScaleInfo { scale_x: scale, scale_y: scale, respect_input_aspect_ratio: false }
     }
 }
 
