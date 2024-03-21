@@ -236,8 +236,6 @@ pub fn crt(img: RgbaImage, src_scale: ScaleInfo, scale: u32) -> RgbaImage {
 
     let src_texel_size_x = 1.0 / src_width as f32;
 
-    let filter = 1.0 / scale as f32;
-
     // Precompute Lanczos weights
     let mut lanczos_weights = vec![vec![0.0; 6]; width as usize];
     for x in 0..width {
@@ -279,7 +277,7 @@ pub fn crt(img: RgbaImage, src_scale: ScaleInfo, scale: u32) -> RgbaImage {
 
         let ratio_scale_y = tex_coord_y * src_height_f - 0.5;
         let yy = ratio_scale_y.floor();
-        let uv_ratio_y= ratio_scale_y - yy;
+        let uv_ratio_y = ratio_scale_y - yy;
 
         for x in 0..width {
             let tex_coord_x = out_texel_size_x * (x as f32 + 0.5);

@@ -1,33 +1,33 @@
 /*
-	DisplayBoy
+    DisplayBoy
 
-	Copyright (C) 2024 coding-fish-1989
+    Copyright (C) 2024 coding-fish-1989
 
-	This program is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or
-	(at your option) any later version.
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-mod shader_support;
-mod utils;
 mod crt;
 mod gb;
 mod gbc;
 mod scaling;
+mod shader_support;
+mod utils;
 
 use base64::{engine::general_purpose, Engine as _};
 use scaling::*;
-use utils::set_panic_hook;
 use std::io::Cursor;
+use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -87,7 +87,12 @@ pub fn process_image_gb(mode: i32, data: Vec<u8>) -> String {
 }
 
 #[wasm_bindgen(js_name = processImageGbCustom)]
-pub fn process_image_gb_custom(fg_color: String, fg_alpha: i32, bg_color: String, data: Vec<u8>) -> String {
+pub fn process_image_gb_custom(
+    fg_color: String,
+    fg_alpha: i32,
+    bg_color: String,
+    data: Vec<u8>,
+) -> String {
     set_panic_hook();
 
     let img = image::load_from_memory(&data).unwrap();
@@ -107,7 +112,7 @@ pub fn process_image_gb_custom(fg_color: String, fg_alpha: i32, bg_color: String
     let mut buf = Vec::new();
     let _ = result.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png);
     return general_purpose::STANDARD.encode(&buf);
-}	
+}
 
 #[wasm_bindgen(js_name = processImageGbc)]
 pub fn process_image_gbc(scale: u32, lcd_mode: u32, color_mode: u32, data: Vec<u8>) -> String {

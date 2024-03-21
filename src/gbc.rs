@@ -20,8 +20,8 @@
 use crate::{scaling, shader_support};
 
 use image::{Rgb, Rgba, RgbaImage};
-use shader_support::*;
 use scaling::*;
+use shader_support::*;
 
 pub struct DisplayProfile {
     pub r: f32,
@@ -78,7 +78,7 @@ pub fn color_gb(
     lcd_mode: u32,
     prof: &DisplayProfile,
 ) -> RgbaImage {
-	let src_img = prepare_src_image(&img, &src_scale);
+    let src_img = prepare_src_image(&img, &src_scale);
 
     let src_width = src_img.width();
     let src_height = src_img.height();

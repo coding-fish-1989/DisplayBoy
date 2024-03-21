@@ -1,12 +1,31 @@
+/*
+    DisplayBoy
+
+    Copyright (C) 2024 coding-fish-1989
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 use crate::shader_support;
 
 use image::RgbaImage;
 use shader_support::*;
 
 pub struct ScaleInfo {
-     pub scale_x: f32,
-     pub scale_y: f32,
-     pub respect_input_aspect_ratio: bool,
+    pub scale_x: f32,
+    pub scale_y: f32,
+    pub respect_input_aspect_ratio: bool,
 }
 
 pub fn detect_src_scale(width: u32, height: u32) -> ScaleInfo {
@@ -15,43 +34,83 @@ pub fn detect_src_scale(width: u32, height: u32) -> ScaleInfo {
     if (aspect_ratio - (240.0 / 160.0)).abs() < 0.01 {
         // GBA
         let scale = width as f32 / 240.0;
-        ScaleInfo { scale_x: scale, scale_y: scale, respect_input_aspect_ratio: false }
+        ScaleInfo {
+            scale_x: scale,
+            scale_y: scale,
+            respect_input_aspect_ratio: false,
+        }
     } else if (aspect_ratio - (160.0 / 144.0)).abs() < 0.01 {
         // GBC
         let scale = width as f32 / 160.0;
-        ScaleInfo { scale_x: scale, scale_y: scale, respect_input_aspect_ratio: false }
-    } else if (aspect_ratio - (256.0 / 224.0)).abs() < 0.01 ||
-              (aspect_ratio - (256.0 / 240.0)).abs() < 0.01 {
+        ScaleInfo {
+            scale_x: scale,
+            scale_y: scale,
+            respect_input_aspect_ratio: false,
+        }
+    } else if (aspect_ratio - (256.0 / 224.0)).abs() < 0.01
+        || (aspect_ratio - (256.0 / 240.0)).abs() < 0.01
+    {
         // Probably SNES or NES - raw resolution
         let scale = width as f32 / 256.0;
-        ScaleInfo { scale_x: scale, scale_y: scale, respect_input_aspect_ratio: false }
+        ScaleInfo {
+            scale_x: scale,
+            scale_y: scale,
+            respect_input_aspect_ratio: false,
+        }
     } else if (aspect_ratio - (252.0 / 238.0)).abs() < 0.01 {
         // Probably NES - raw resolution
         // Appears in spiritualized1997 NES video.json
         let scale = width as f32 / 252.0;
-        ScaleInfo { scale_x: scale, scale_y: scale, respect_input_aspect_ratio: false }
-    } else if (aspect_ratio - (240.0 / 224.0)).abs() < 0.01 ||
-              (aspect_ratio - (240.0 / 238.0)).abs() < 0.01 {
+        ScaleInfo {
+            scale_x: scale,
+            scale_y: scale,
+            respect_input_aspect_ratio: false,
+        }
+    } else if (aspect_ratio - (240.0 / 224.0)).abs() < 0.01
+        || (aspect_ratio - (240.0 / 238.0)).abs() < 0.01
+    {
         // Probably NES - raw resolution
         // Appears in spiritualized1997 NES video.json
         let scale = width as f32 / 240.0;
-        ScaleInfo { scale_x: scale, scale_y: scale, respect_input_aspect_ratio: false }
-    } else if (aspect_ratio - (64.0 / 49.0)).abs() < 0.01 ||
-              (aspect_ratio - (8.0 / 7.0)).abs() < 0.01 {
+        ScaleInfo {
+            scale_x: scale,
+            scale_y: scale,
+            respect_input_aspect_ratio: false,
+        }
+    } else if (aspect_ratio - (64.0 / 49.0)).abs() < 0.01
+        || (aspect_ratio - (8.0 / 7.0)).abs() < 0.01
+    {
         // Probably upscaled CRT with height of 224
-        ScaleInfo { scale_x: width as f32 / 256.0, scale_y: height as f32 / 224.0, respect_input_aspect_ratio: true }
-    } else if (aspect_ratio - (128.0 / 105.0)).abs() < 0.01 ||
-              (aspect_ratio - (16.0 / 15.0)).abs() < 0.01 {
+        ScaleInfo {
+            scale_x: width as f32 / 256.0,
+            scale_y: height as f32 / 224.0,
+            respect_input_aspect_ratio: true,
+        }
+    } else if (aspect_ratio - (128.0 / 105.0)).abs() < 0.01
+        || (aspect_ratio - (16.0 / 15.0)).abs() < 0.01
+    {
         // Probably upscaled CRT with height of 240
-        ScaleInfo { scale_x: width as f32 / 256.0, scale_y: height as f32 / 240.0, respect_input_aspect_ratio: true }
+        ScaleInfo {
+            scale_x: width as f32 / 256.0,
+            scale_y: height as f32 / 240.0,
+            respect_input_aspect_ratio: true,
+        }
     } else if width == 512 && (height == 240 || height == 224) {
         // agg23's SNES core support
         // https://github.com/agg23/openfpga-SNES/blob/master/dist/Cores/agg23.SNES/video.json
-        ScaleInfo { scale_x: 2.0, scale_y: 1.0, respect_input_aspect_ratio: false }
+        ScaleInfo {
+            scale_x: 2.0,
+            scale_y: 1.0,
+            respect_input_aspect_ratio: false,
+        }
     } else {
         // Fallback to 240p
         let scale = height as f32 / 240.0;
-        ScaleInfo { scale_x: scale, scale_y: scale, respect_input_aspect_ratio: false }
+        ScaleInfo {
+            scale_x: scale,
+            scale_y: scale,
+            respect_input_aspect_ratio: false,
+        }
     }
 }
 

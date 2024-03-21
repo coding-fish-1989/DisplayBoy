@@ -1,94 +1,105 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta name="description" content="Convert GB, GBC, and GBA screenshots to resemble the display of the actual device more closely.">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="icon" type="image/x-icon" href="img/favicon.png">
-        <link rel="stylesheet" href="css/pico.min.css">
-        <title>DisplayBoy: GB, GBC, and GBA Display Filter</title>
-        <style>
-.logoHeader {
-    margin: 0px;
-}
-.logo {
-    margin-left: -10px;
-}
-hr {
-    margin-top: 30px;
-    margin-bottom: 30px;
-}
-.invisible {
-    display:none;
-}
-#fileOutput {
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-}
-        </style>
-        <script>
-            function updateForm() {
-                var index = document.getElementById('colorMode').selectedIndex;
-                var gbCustomFormClass = document.getElementById('gbCustomForm').classList;
-                var lcdModeFormClass = document.getElementById('lcdModeForm').classList;
-                var scalingFormClass = document.getElementById('scalingForm').classList;
 
-                if (index <= 3 || index == 8)  {
-                    lcdModeFormClass.add('invisible');
-                } else {
-                    lcdModeFormClass.remove('invisible');
-                }
-                if (index != 3) {
-                    gbCustomFormClass.add('invisible');
-                } else {
-                    gbCustomFormClass.remove('invisible');
-                }
-                if (index < 4) {
-                    scalingFormClass.add('invisible');
-                } else {
-                    scalingFormClass.remove('invisible');
-                }
+<head>
+    <meta charset="utf-8">
+    <meta name="description"
+        content="Convert GB, GBC, and GBA screenshots to resemble the display of the actual device more closely.">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/x-icon" href="img/favicon.png">
+    <link rel="stylesheet" href="css/pico.min.css">
+    <title>DisplayBoy: GB, GBC, and GBA Display Filter</title>
+    <style>
+        .logoHeader {
+            margin: 0px;
+        }
 
-                document.getElementById('gbCustomFgOpacityDisplay').value = document.getElementById('gbCustomFgOpacity').value
-                document.getElementById('scalingDisplay').value = document.getElementById('scaling').value
+        .logo {
+            margin-left: -10px;
+        }
+
+        hr {
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+
+        .invisible {
+            display: none;
+        }
+
+        #fileOutput {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
+    <script>
+        function updateForm() {
+            var index = document.getElementById('colorMode').selectedIndex;
+            var gbCustomFormClass = document.getElementById('gbCustomForm').classList;
+            var lcdModeFormClass = document.getElementById('lcdModeForm').classList;
+            var scalingFormClass = document.getElementById('scalingForm').classList;
+
+            if (index <= 3 || index == 8) {
+                lcdModeFormClass.add('invisible');
+            } else {
+                lcdModeFormClass.remove('invisible');
             }
-        </script>
-    </head>
-    <body>
-        <main class="container">
-            <nav style="float:right">
-                <ul>
-                    <li><a href="https://github.com/coding-fish-1989/DisplayBoy" target="_blank">GitHub</a></li>
-                    <li><a href="https://github.com/coding-fish-1989/DisplayBoy/blob/main/ATTRIBUTIONS.md" target="_blank">Attributions</a></li>
-                </ul>
-            </nav>
-            <h1 class="logoHeader">
-                <picture>
-                    <source srcset="img/db_logo_light_1x.png 1x, img/db_logo_light_2x.png 2x" media="screen and (prefers-color-scheme: light)">
-                    <source srcset="img/db_logo_dark_1x.png 1x, img/db_logo_dark_2x.png 2x" media="screen and (prefers-color-scheme: dark)">
-                    <img src="img/db_logo_light_1x.png" alt="DisplayBoy" class="logo">
-                </picture>
-            </h1>
-            <p class="description">Convert GB, GBC, and GBA screenshots to resemble the display of the actual device more closely.</p>
-            <hr>
-            <fieldset>
-                <label for="fileInput">Select Image
-                    <input type="file" id="fileInput" accept=".png,.jpg,.jpeg">
-                </label>
-                <label for="colorMode">Color Mode
-                    <select id="colorMode" name="colorMode" oninput="updateForm()">
-                        <option value="gb">GB</option>
-                        <option value="gbp">GBP</option>
-                        <option value="gbl">GBL</option>
-                        <option value="gbCustom">GB Custom</option>
-                        <option value="gbc">GBC</option>
-                        <option value="gba">GBA</option>
-                        <option value="gbaSp">GBA SP</option>
-                        <option value="gbaSpWhite">GBA SP White</option>
-                        <option value="crt">CRT</option>
-                    </select>
-                </label>
+            if (index != 3) {
+                gbCustomFormClass.add('invisible');
+            } else {
+                gbCustomFormClass.remove('invisible');
+            }
+            if (index < 4) {
+                scalingFormClass.add('invisible');
+            } else {
+                scalingFormClass.remove('invisible');
+            }
+
+            document.getElementById('gbCustomFgOpacityDisplay').value = document.getElementById('gbCustomFgOpacity').value
+            document.getElementById('scalingDisplay').value = document.getElementById('scaling').value
+        }
+    </script>
+</head>
+
+<body>
+    <main class="container">
+        <nav style="float:right">
+            <ul>
+                <li><a href="https://github.com/coding-fish-1989/DisplayBoy" target="_blank">GitHub</a></li>
+                <li><a href="https://github.com/coding-fish-1989/DisplayBoy/blob/main/ATTRIBUTIONS.md"
+                        target="_blank">Attributions</a></li>
+            </ul>
+        </nav>
+        <h1 class="logoHeader">
+            <picture>
+                <source srcset="img/db_logo_light_1x.png 1x, img/db_logo_light_2x.png 2x"
+                    media="screen and (prefers-color-scheme: light)">
+                <source srcset="img/db_logo_dark_1x.png 1x, img/db_logo_dark_2x.png 2x"
+                    media="screen and (prefers-color-scheme: dark)">
+                <img src="img/db_logo_light_1x.png" alt="DisplayBoy" class="logo">
+            </picture>
+        </h1>
+        <p class="description">Convert GB, GBC, and GBA screenshots to resemble the display of the actual device more
+            closely.</p>
+        <hr>
+        <fieldset>
+            <label for="fileInput">Select Image
+                <input type="file" id="fileInput" accept=".png,.jpg,.jpeg">
+            </label>
+            <label for="colorMode">Color Mode
+                <select id="colorMode" name="colorMode" oninput="updateForm()">
+                    <option value="gb">GB</option>
+                    <option value="gbp">GBP</option>
+                    <option value="gbl">GBL</option>
+                    <option value="gbCustom">GB Custom</option>
+                    <option value="gbc">GBC</option>
+                    <option value="gba">GBA</option>
+                    <option value="gbaSp">GBA SP</option>
+                    <option value="gbaSpWhite">GBA SP White</option>
+                    <option value="crt">CRT</option>
+                </select>
+            </label>
                 <div id="gbCustomForm" class="grid invisible">
                     <div>
                         <label for="gbCustomBg">Background Color
