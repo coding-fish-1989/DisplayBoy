@@ -33,7 +33,8 @@ convertButton.onclick = function () {
             let resDataBase64 = wasm.processImageGbc(scalingVal, lcdModeVal, colorModeValue - 4, data);
             fileOutput.src = "data:image/png;base64," + resDataBase64;
         } else {
-            let resDataBase64 = wasm.processImageCrt(6, data);
+            let scalingVal = parseInt(scaling.value);
+            let resDataBase64 = wasm.processImageCrt(scalingVal, data);
             fileOutput.src = "data:image/png;base64," + resDataBase64;
         }
     }
