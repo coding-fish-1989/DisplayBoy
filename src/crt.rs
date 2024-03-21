@@ -279,7 +279,7 @@ pub fn crt(img: RgbaImage, src_scale: ScaleInfo, scale: u32) -> RgbaImage {
 
         let ratio_scale_y = tex_coord_y * src_height_f - 0.5;
         let yy = ratio_scale_y.floor();
-        let uv_ratio_y_orig = ratio_scale_y - yy;
+        let uv_ratio_y= ratio_scale_y - yy;
 
         for x in 0..width {
             let tex_coord_x = out_texel_size_x * (x as f32 + 0.5);
@@ -306,25 +306,10 @@ pub fn crt(img: RgbaImage, src_scale: ScaleInfo, scale: u32) -> RgbaImage {
             col2 = col2.clamp01();
 
             // Scanline
-            let mut uv_ratio_y = uv_ratio_y_orig;
-
             let wid = scanline_wid(col);
             let wid2 = scanline_wid(col2);
-
             let weights = scanline_weights(uv_ratio_y, wid);
             let weights2 = scanline_weights(1.0 - uv_ratio_y, wid2);
-
-            uv_ratio_y = uv_ratio_y + 1.0 / 3.0 * filter as f32;
-            let weights = weights.add(scanline_weights(uv_ratio_y, wid)).div_f(3.0);
-            let weights2 = weights2
-                .add(scanline_weights(1.0 - uv_ratio_y, wid2))
-                .div_f(3.0);
-
-            uv_ratio_y = uv_ratio_y - 2.0 / 3.0 * filter as f32;
-            let weights = weights.add(scanline_weights(uv_ratio_y.abs(), wid).div_f(3.0));
-            let weights2 =
-                weights2.add(scanline_weights((1.0 - uv_ratio_y).abs(), wid2).div_f(3.0));
-
             let color = col.mult(weights).add(col2.mult(weights2));
 
             // Dotmask
