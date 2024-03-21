@@ -44,9 +44,10 @@
    - And obviously written in Rust
 */
 
-use crate::shader_support;
+use crate::{scaling, shader_support};
 
 use image::{Rgb, Rgba, RgbaImage};
+use scaling::*;
 use shader_support::*;
 
 pub const CRT_MARGIN: u32 = 4;
@@ -134,7 +135,7 @@ fn apply_lut_rgb3d(col: Rgba<f32>, lut: &[Rgb<f32>; 32 * 32 * 32]) -> Rgb<f32> {
     lerp_color(c0, c1, dz)
 }
 
-pub fn crt(img: RgbaImage, src_scale: (f32, f32), scale: u32) -> RgbaImage {
+pub fn crt(img: RgbaImage, src_scale: ScaleInfo, scale: u32) -> RgbaImage {
     let lut_png = include_bytes!("crt_lut.png");
     let lut_img = image::load_from_memory(lut_png).unwrap().to_rgba8();
     let mut lut = [Rgb::<f32>([0.0, 0.0, 0.0]); 32 * 32 * 32];
@@ -169,16 +170,30 @@ pub fn crt(img: RgbaImage, src_scale: (f32, f32), scale: u32) -> RgbaImage {
     let (src_width, src_height) = (img.width(), img.height());
 
     let (target_width, target_height) =
-        calculate_scaled_buffer_size(src_width, src_height, src_scale);
+        calculate_scaled_buffer_size(src_width, src_height, &src_scale);
+
+    let output_width_factor = if src_scale.respect_input_aspect_ratio {
+        // The source image might be a different aspect ratio than the target
+        // This can happen if the image was upscaled and then stretched to reflect the non square pixel.
+        // The following code will respect the source image's aspect ratio and calculated the output width factor.
+        let desired_aspect_ratio = src_width as f32 / src_height as f32;
+        let source_aspect_ratio = target_width as f32 / target_height as f32;
+        desired_aspect_ratio / source_aspect_ratio
+    } else {
+        1.0
+    };
 
     let mut top_margin = CRT_MARGIN;
     if target_height < 240 && target_height >= 224 {
         top_margin += (240 - target_height) / 2;
     }
 
+    // The margin is defined to be in a output unit, which should counter the stretching
+    let left_margin = (CRT_MARGIN as f32 / output_width_factor).ceil() as u32;
+
     // Create a source buffer with margins
     let (buff_width, buff_height) = (
-        target_width + CRT_MARGIN * 2,
+        target_width + left_margin * 2,
         target_height + top_margin * 2,
     );
     let mut buff = FloatImage::new(buff_width, buff_height);
@@ -191,7 +206,7 @@ pub fn crt(img: RgbaImage, src_scale: (f32, f32), scale: u32) -> RgbaImage {
         for x in 0..buff_width {
             // Nearest neighbor downscale
             let x_coord =
-                (x as i32 - CRT_MARGIN as i32) as f32 / target_width as f32 + x_target_half_texel;
+                (x as i32 - left_margin as i32) as f32 / target_width as f32 + x_target_half_texel;
             let y_coord =
                 (y as i32 - top_margin as i32) as f32 / target_height as f32 + y_target_half_texel;
             let x_src = (x_coord * src_width as f32).floor() as i32;
@@ -201,7 +216,10 @@ pub fn crt(img: RgbaImage, src_scale: (f32, f32), scale: u32) -> RgbaImage {
     }
 
     let (src_width, src_height) = (buff_width, buff_height);
-    let (width, height) = (src_width * scale, src_height * scale);
+    let (width, height) = (
+        (src_width as f32 * scale as f32 * output_width_factor).ceil() as u32,
+        src_height * scale,
+    );
 
     let src_width_f = src_width as f32;
     let src_height_f = src_height as f32;

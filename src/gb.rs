@@ -17,10 +17,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::shader_support;
+use crate::{scaling, shader_support};
 
 use image::{Luma, Rgb, Rgba, RgbaImage};
 use shader_support::*;
+use scaling::*;
 
 #[inline(always)]
 fn load_alpha_checked(buff: &AlphaImage, x: i32, y: i32, width: u32, height: u32) -> f32 {
@@ -109,7 +110,7 @@ pub struct GbDisplayProfile {
     pub background_b: f32,
 }
 
-pub fn gb_mono(img: RgbaImage, src_scale: (f32, f32), profile: GbDisplayProfile) -> RgbaImage {
+pub fn gb_mono(img: RgbaImage, src_scale: ScaleInfo, profile: GbDisplayProfile) -> RgbaImage {
     let src_width = img.width();
     let src_height = img.height();
 
@@ -130,7 +131,7 @@ pub fn gb_mono(img: RgbaImage, src_scale: (f32, f32), profile: GbDisplayProfile)
 
     // Need to accommodate for non-integer scaling
     let (target_width, target_height) =
-        calculate_scaled_buffer_size(src_width, src_height, src_scale);
+        calculate_scaled_buffer_size(src_width, src_height, &src_scale);
 
     // Quantize to alpha, downscale to real device resolution, and store
     let mut buff = AlphaImage::new(target_width, target_height);

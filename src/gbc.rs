@@ -17,10 +17,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::shader_support;
+use crate::{scaling, shader_support};
 
 use image::{Rgb, Rgba, RgbaImage};
 use shader_support::*;
+use scaling::*;
 
 pub struct DisplayProfile {
     pub r: f32,
@@ -72,12 +73,12 @@ fn color_correct(c: Rgb<f32>, p: &DisplayProfile) -> Rgb<f32> {
 
 pub fn color_gb(
     img: RgbaImage,
-    src_scale: (f32, f32),
+    src_scale: ScaleInfo,
     scale: u32,
     lcd_mode: u32,
     prof: &DisplayProfile,
 ) -> RgbaImage {
-	let src_img = prepare_src_image(img, src_scale);
+	let src_img = prepare_src_image(&img, &src_scale);
 
     let src_width = src_img.width();
     let src_height = src_img.height();

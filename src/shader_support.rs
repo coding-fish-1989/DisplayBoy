@@ -17,7 +17,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use image::{ImageBuffer, Luma, Rgb, Rgba, RgbaImage};
+use image::{ImageBuffer, Luma, Rgb, Rgba};
 
 // convert f32 gamma to linear
 #[inline(always)]
@@ -186,23 +186,6 @@ pub fn clamp(v: f32, min: f32, max: f32) -> f32 {
 }
 
 #[inline(always)]
-fn conservative_ceil_to_u32(v: f32) -> u32 {
-    // Drop the fractional part if it's nearly zero.
-    // This will allow for non integer original image scaling to be scaled back to the original resolution better.
-    if v.fract().abs() < 0.01 {
-        return v as u32;
-    }
-    v.ceil() as u32
-}
-
-#[inline(always)]
-pub fn calculate_scaled_buffer_size(width: u32, height: u32, scale: (f32, f32)) -> (u32, u32) {
-    let width = conservative_ceil_to_u32(width as f32 / scale.0 as f32);
-    let height = conservative_ceil_to_u32(height as f32 / scale.1 as f32);
-    (width, height)
-}
-
-#[inline(always)]
 pub fn float_to_byte(v: f32) -> u8 {
     if v >= 1.0 {
         return 255;
@@ -229,27 +212,4 @@ pub fn rgba_u8_to_rgb_f32(rgb: Rgba<u8>) -> Rgb<f32> {
         rgb[1] as f32 / 255.0,
         rgb[2] as f32 / 255.0,
     ])
-}
-
-pub fn prepare_src_image(img: RgbaImage, src_scale: (f32, f32)) -> FloatImage {
-    let src_width = img.width();
-    let src_height = img.height();
-
-    let (target_width, target_height) =
-        calculate_scaled_buffer_size(src_width, src_height, src_scale);
-    let mut buff = FloatImage::new(target_width, target_height);
-    let x_target_half_texel = 1.0 / (target_width as f32 * 2.0);
-    let y_target_half_texel = 1.0 / (target_height as f32 * 2.0);
-    for y in 0..target_height {
-        for x in 0..target_width {
-            let x_coord = x as f32 / target_width as f32 + x_target_half_texel;
-            let y_coord = y as f32 / target_height as f32 + y_target_half_texel;
-            let x_src = (x_coord * src_width as f32).floor() as u32;
-            let y_src = (y_coord * src_height as f32).floor() as u32;
-            let p = img.get_pixel(x_src, y_src);
-            let p = rgba_u8_to_rgb_f32(*p).to_linear();
-            buff.put_pixel(x, y, p);
-        }
-    }
-    buff
 }
