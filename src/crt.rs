@@ -135,7 +135,13 @@ fn apply_lut_rgb3d(col: Rgba<f32>, lut: &[Rgb<f32>; 32 * 32 * 32]) -> Rgb<f32> {
     lerp_color(c0, c1, dz)
 }
 
-pub fn crt(img: RgbaImage, src_scale: ScaleInfo, scale: u32) -> RgbaImage {
+pub fn crt(
+    img: RgbaImage,
+    src_scale: ScaleInfo,
+    scale: u32,
+    explicit_aspect_ratio: bool,
+    pixel_aspect_ratio: f32,
+) -> RgbaImage {
     let lut_png = include_bytes!("crt_lut.png");
     let lut_img = image::load_from_memory(lut_png).unwrap().to_rgba8();
     let mut lut = [Rgb::<f32>([0.0, 0.0, 0.0]); 32 * 32 * 32];
@@ -172,7 +178,20 @@ pub fn crt(img: RgbaImage, src_scale: ScaleInfo, scale: u32) -> RgbaImage {
     let (target_width, target_height) =
         calculate_scaled_buffer_size(src_width, src_height, &src_scale);
 
-    let output_width_factor = if src_scale.respect_input_aspect_ratio {
+    // Automatic height padding for devices like SNES
+    let vertical_padding = if target_height < 240 && target_height >= 224 {
+        let total_pad = 240 - target_height;
+        // Split padding evenly, with the remainder going to the bottom
+        let pad_top = total_pad / 2;
+        let pad_bottom = total_pad - pad_top;
+        (pad_top, pad_bottom)
+    } else {
+        (0, 0) // No padding
+    };
+
+    let output_width_factor = if explicit_aspect_ratio {
+        pixel_aspect_ratio
+    } else if src_scale.respect_input_aspect_ratio {
         // The source image might be a different aspect ratio than the target
         // This can happen if the image was upscaled and then stretched to reflect the non square pixel.
         // The following code will respect the source image's aspect ratio and calculated the output width factor.
@@ -183,18 +202,14 @@ pub fn crt(img: RgbaImage, src_scale: ScaleInfo, scale: u32) -> RgbaImage {
         1.0
     };
 
-    let mut top_margin = CRT_MARGIN;
-    if target_height < 240 && target_height >= 224 {
-        top_margin += (240 - target_height) / 2;
-    }
-
-    // The margin is defined to be in a output unit, which should counter the stretching
+    let top_margin = CRT_MARGIN + vertical_padding.0;
+    // The margin is defined to be in a unit after applying aspect ratio stretching
     let left_margin = (CRT_MARGIN as f32 / output_width_factor).ceil() as u32;
 
     // Create a source buffer with margins
     let (buff_width, buff_height) = (
         target_width + left_margin * 2,
-        target_height + top_margin * 2,
+        target_height + CRT_MARGIN * 2 + vertical_padding.0 + vertical_padding.1,
     );
     let mut buff = FloatImage::new(buff_width, buff_height);
 

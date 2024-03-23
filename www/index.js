@@ -8,6 +8,7 @@ let gbFgOpacity = document.getElementById('gbCustomFgOpacity');
 let gbBgColor = document.getElementById('gbCustomBg');
 let lcdMode = document.getElementById('lcdMode');
 let scaling = document.getElementById('scaling');
+let par = document.getElementById('par');
 let convertButton = document.getElementById('convertButton');
 let errorText = document.getElementById('convError');
 
@@ -34,7 +35,18 @@ convertButton.onclick = function () {
             fileOutput.src = "data:image/png;base64," + resDataBase64;
         } else {
             let scalingVal = parseInt(scaling.value);
-            let resDataBase64 = wasm.processImageCrt(scalingVal, data);
+            let parVal = par.value;
+            let explicitAspectRatio = false;
+            if (parVal == "auto") {
+                parVal = 0;
+            } else {
+                let aspectRatio = parVal.split(":");
+                let aspectRatioX = parseFloat(aspectRatio[0]);
+                let aspectRatioY = parseFloat(aspectRatio[1]);
+                parVal = aspectRatioX / aspectRatioY;
+                explicitAspectRatio = true;
+            }
+            let resDataBase64 = wasm.processImageCrt(scalingVal, explicitAspectRatio, parVal, data);
             fileOutput.src = "data:image/png;base64," + resDataBase64;
         }
     }

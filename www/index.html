@@ -39,6 +39,7 @@
             var gbCustomFormClass = document.getElementById('gbCustomForm').classList;
             var lcdModeFormClass = document.getElementById('lcdModeForm').classList;
             var scalingFormClass = document.getElementById('scalingForm').classList;
+            var parClass = document.getElementById('parForm').classList;
 
             if (index <= 3 || index == 8) {
                 lcdModeFormClass.add('invisible');
@@ -54,6 +55,11 @@
                 scalingFormClass.add('invisible');
             } else {
                 scalingFormClass.remove('invisible');
+            }
+            if (index != 8) {
+                parClass.add('invisible');
+            } else {
+                parClass.remove('invisible');
             }
 
             document.getElementById('gbCustomFgOpacityDisplay').value = document.getElementById('gbCustomFgOpacity').value
@@ -129,6 +135,15 @@
                     <output id="scalingDisplay" style="float:right">5</output>
                     <label for="scaling">Scale
                         <input id="scaling" name="scaling" type="range" min="1" max="8" value="5" oninput="updateForm()">
+                    </label>
+                </div>
+                <div id="parForm" class="invisible">
+                    <label for="par">Pixel Aspect Ratio
+                        <select id="par" name="par">
+                            <option value="auto">Automatic</option>
+                            <option value="1:1">1:1 (Square)</option>
+                            <option value="8:7">8:7</option>
+                        </select>
                     </label>
                 </div>
 

@@ -97,6 +97,7 @@ pub fn process_image_gb_custom(
 
     let img = image::load_from_memory(&data).unwrap();
 
+    // Color input is in the format #RRGGBB
     let prof = gb::GbDisplayProfile {
         foreground_r: i32::from_str_radix(&fg_color[1..3], 16).unwrap() as f32 / 255.0,
         foreground_g: i32::from_str_radix(&fg_color[3..5], 16).unwrap() as f32 / 255.0,
@@ -201,12 +202,23 @@ pub fn process_image_gbc(scale: u32, lcd_mode: u32, color_mode: u32, data: Vec<u
 }
 
 #[wasm_bindgen(js_name = processImageCrt)]
-pub fn process_image_crt(scale: u32, data: Vec<u8>) -> String {
+pub fn process_image_crt(
+    scale: u32,
+    explicit_aspect_ratio: bool,
+    pixel_aspect_ratio: f32,
+    data: Vec<u8>,
+) -> String {
     set_panic_hook();
 
     let img = image::load_from_memory(&data).unwrap();
     let src_scale = detect_src_scale(img.width(), img.height());
-    let result = crt::crt(img.into_rgba8(), src_scale, scale);
+    let result = crt::crt(
+        img.into_rgba8(),
+        src_scale,
+        scale,
+        explicit_aspect_ratio,
+        pixel_aspect_ratio,
+    );
 
     let mut buf = Vec::new();
     let _ = result.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png);
