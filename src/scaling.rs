@@ -31,54 +31,54 @@ pub struct ScaleInfo {
 pub fn detect_src_scale(width: u32, height: u32) -> ScaleInfo {
     // Detect input resolution and infer the original image resolution
     let aspect_ratio = width as f32 / height as f32;
-    if (aspect_ratio - (240.0 / 160.0)).abs() < 0.01 {
+    if (aspect_ratio - (240.0 / 160.0)).abs() < 0.001 {
         // GBA
-        let scale = width as f32 / 240.0;
+        let scale = (width as f32 / 240.0).max(1.0);
         ScaleInfo {
             scale_x: scale,
             scale_y: scale,
             respect_input_aspect_ratio: false,
         }
-    } else if (aspect_ratio - (160.0 / 144.0)).abs() < 0.01 {
+    } else if (aspect_ratio - (160.0 / 144.0)).abs() < 0.001 {
         // GBC
-        let scale = width as f32 / 160.0;
+        let scale = (width as f32 / 160.0).max(1.0);
         ScaleInfo {
             scale_x: scale,
             scale_y: scale,
             respect_input_aspect_ratio: false,
         }
-    } else if (aspect_ratio - (256.0 / 224.0)).abs() < 0.01
+    } else if (aspect_ratio - (256.0 / 224.0)).abs() < 0.001
         || (aspect_ratio - (256.0 / 240.0)).abs() < 0.01
     {
         // Probably SNES or NES - raw resolution
-        let scale = width as f32 / 256.0;
+        let scale = (width as f32 / 256.0).max(1.0);
         ScaleInfo {
             scale_x: scale,
             scale_y: scale,
             respect_input_aspect_ratio: false,
         }
-    } else if (aspect_ratio - (252.0 / 238.0)).abs() < 0.01 {
+    } else if (aspect_ratio - (252.0 / 238.0)).abs() < 0.001 {
         // Probably NES - raw resolution
         // Appears in spiritualized1997 NES video.json
-        let scale = width as f32 / 252.0;
+        let scale = (width as f32 / 252.0).max(1.0);
         ScaleInfo {
             scale_x: scale,
             scale_y: scale,
             respect_input_aspect_ratio: false,
         }
-    } else if (aspect_ratio - (240.0 / 224.0)).abs() < 0.01
-        || (aspect_ratio - (240.0 / 238.0)).abs() < 0.01
+    } else if (aspect_ratio - (240.0 / 224.0)).abs() < 0.001
+        || (aspect_ratio - (240.0 / 238.0)).abs() < 0.001
     {
         // Probably NES - raw resolution
         // Appears in spiritualized1997 NES video.json
-        let scale = width as f32 / 240.0;
+        let scale = (width as f32 / 240.0).max(1.0);
         ScaleInfo {
             scale_x: scale,
             scale_y: scale,
             respect_input_aspect_ratio: false,
         }
-    } else if (aspect_ratio - (64.0 / 49.0)).abs() < 0.01
-        || (aspect_ratio - (8.0 / 7.0)).abs() < 0.01
+    } else if (aspect_ratio - (64.0 / 49.0)).abs() < 0.001
+        || (aspect_ratio - (8.0 / 7.0)).abs() < 0.001
     {
         // Probably upscaled CRT with height of 224
         ScaleInfo {
@@ -86,8 +86,8 @@ pub fn detect_src_scale(width: u32, height: u32) -> ScaleInfo {
             scale_y: height as f32 / 224.0,
             respect_input_aspect_ratio: true,
         }
-    } else if (aspect_ratio - (128.0 / 105.0)).abs() < 0.01
-        || (aspect_ratio - (16.0 / 15.0)).abs() < 0.01
+    } else if (aspect_ratio - (128.0 / 105.0)).abs() < 0.001
+        || (aspect_ratio - (16.0 / 15.0)).abs() < 0.001
     {
         // Probably upscaled CRT with height of 240
         ScaleInfo {
@@ -104,8 +104,8 @@ pub fn detect_src_scale(width: u32, height: u32) -> ScaleInfo {
             respect_input_aspect_ratio: false,
         }
     } else {
-        // Fallback to 240p
-        let scale = height as f32 / 240.0;
+        // Fallback to 240p if too large
+        let scale = (height as f32 / 240.0).max(1.0);
         ScaleInfo {
             scale_x: scale,
             scale_y: scale,
