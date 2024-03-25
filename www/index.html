@@ -19,6 +19,16 @@
             margin-left: -10px;
         }
 
+        .selection-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .selection-container span {
+            white-space: nowrap;
+        }
+
         hr {
             margin-top: 30px;
             margin-bottom: 30px;
@@ -97,28 +107,52 @@
             <fieldset>
                 <legend>Device</legend>
                 <article>
-                    <input type="radio" id="gbColorMode" name="colorMode" value="0" checked>
-                    <label for="gbColorMode">GB</label>
-                    <input type="radio" id="gbpColorMode" name="colorMode" value="1">
-                    <label for="gbpColorMode">GBP</label>
-                    <input type="radio" id="gblColorMode" name="colorMode" value="2">
-                    <label for="gblColorMode">GBL</label>
-                    <input type="radio" id="gbCustomColorMode" name="colorMode" value="3">
-                    <label for="gbCustomColorMode">GB Custom</label>
+                    <div class="selection-container">
+                        <span>
+                            <input type="radio" id="gbColorMode" name="colorMode" value="0" checked>
+                            <label for="gbColorMode">GB</label>
+                        </span>
+                        <span>
+                            <input type="radio" id="gbpColorMode" name="colorMode" value="1">
+                            <label for="gbpColorMode">GBP</label>
+                        </span>
+                        <span>
+                            <input type="radio" id="gblColorMode" name="colorMode" value="2">
+                            <label for="gblColorMode">GBL</label>
+                        </span>
+                        <span>
+                            <input type="radio" id="gbCustomColorMode" name="colorMode" value="3">
+                            <label for="gbCustomColorMode">GB Custom</label>
+                        </span>
+                    </div>
                 </article>
                 <article>
-                    <input type="radio" id="gbcColorMode" name="colorMode" value="4">
-                    <label for="gbcColorMode">GBC</label>
-                    <input type="radio" id="gbaColorMode" name="colorMode" value="5">
-                    <label for="gbaColorMode">GBA</label>
-                    <input type="radio" id="gbaSpColorMode" name="colorMode" value="6">
-                    <label for="gbaSpColorMode">GBA SP</label>
-                    <input type="radio" id="gbaSpWhiteColorMode" name="colorMode" value="7">
-                    <label for="gbaSpWhiteColorMode">GBA SP White</label>
+                    <div class="selection-container">
+                        <span>
+                            <input type="radio" id="gbcColorMode" name="colorMode" value="4">
+                            <label for="gbcColorMode">GBC</label>
+                        </span>
+                        <span>
+                            <input type="radio" id="gbaColorMode" name="colorMode" value="5">
+                            <label for="gbaColorMode">GBA</label>
+                        </span>
+                        <span>
+                            <input type="radio" id="gbaSpColorMode" name="colorMode" value="6">
+                            <label for="gbaSpColorMode">GBA SP</label>
+                        </span>
+                        <span>
+                            <input type="radio" id="gbaSpWhiteColorMode" name="colorMode" value="7">
+                            <label for="gbaSpWhiteColorMode">GBA SP White</label>
+                        </span>
+                    </div>
                 </article>
                 <article>
-                    <input type="radio" id="crtColorMode" name="colorMode" value="8">
-                    <label for="crtColorMode">CRT</label>
+                    <div class="selection-container">
+                        <span>
+                            <input type="radio" id="crtColorMode" name="colorMode" value="8">
+                            <label for="crtColorMode">CRT</label>
+                        </span>
+                    </div>
                 </article>
             </fieldset>
             <div id="gbCustomForm" class="grid invisible">
@@ -141,12 +175,20 @@
             <div id="lcdModeForm" class="invisible">
                 <fieldset>
                     <legend>LCD Mode</legend>
-                    <input type="radio" id="lcdModeSameboy" name="lcdMode" value="0" checked>
-                    <label for="lcdModeSameboy">Sameboy</label>
-                    <input type="radio" id="lcdModeLcdv2" name="lcdMode" value="1">
-                    <label for="lcdModeLcdv2">LCD Grid v2</label>
-                    <input type="radio" id="lcdModeOff" name="lcdMode" value="2">
-                    <label for="lcdModeOff">Off</label>
+                    <div class="selection-container">
+                        <span>
+                            <input type="radio" id="lcdModeSameboy" name="lcdMode" value="0" checked>
+                            <label for="lcdModeSameboy">Sameboy</label>
+                        </span>
+                        <span>
+                            <input type="radio" id="lcdModeLcdv2" name="lcdMode" value="1">
+                            <label for="lcdModeLcdv2">LCD Grid v2</label>
+                        </span>
+                        <span>
+                            <input type="radio" id="lcdModeOff" name="lcdMode" value="2">
+                            <label for="lcdModeOff">Off</label>
+                        </span>
+                    </div>
                 </fieldset>
             </div>
             <div id="scalingForm" class="invisible">
@@ -158,12 +200,20 @@
             <div id="parForm" class="invisible">
                 <fieldset>
                     <legend>Pixel Aspect Ratio</legend>
-                    <input type="radio" id="parAuto" name="par" value="auto" checked>
-                    <label for="parAuto">Automatic</label>
-                    <input type="radio" id="par1x1" name="par" value="1:1">
-                    <label for="par1x1">1:1 (Square)</label>
-                    <input type="radio" id="par8x7" name="par" value="8:7">
-                    <label for="par8x7">8:7</label>
+                    <div class="selection-container">
+                        <span>
+                            <input type="radio" id="parAuto" name="par" value="auto" checked>
+                            <label for="parAuto">Automatic</label>
+                        </span>
+                        <span>
+                            <input type="radio" id="par1x1" name="par" value="1:1">
+                            <label for="par1x1">1:1 (Square)</label>
+                        </span>
+                        <span>
+                            <input type="radio" id="par8x7" name="par" value="8:7">
+                            <label for="par8x7">8:7</label>
+                        </span>
+                    </div>
                 </fieldset>
             </div>
         </fieldset>
