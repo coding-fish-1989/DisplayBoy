@@ -2,23 +2,21 @@ import * as wasm from "display-boy";
 
 let fileInput = document.getElementById('fileInput');
 let fileOutput = document.getElementById('fileOutput');
-let colorMode = document.getElementById('colorMode');
 let gbFgColor = document.getElementById('gbCustomFg');
 let gbFgOpacity = document.getElementById('gbCustomFgOpacity');
 let gbBgColor = document.getElementById('gbCustomBg');
-let lcdMode = document.getElementById('lcdMode');
 let scaling = document.getElementById('scaling');
-let par = document.getElementById('par');
 let convertButton = document.getElementById('convertButton');
 let errorText = document.getElementById('convError');
 
 convertButton.onclick = function () {
-    let files = document.getElementById('fileInput').files;
+    let files = fileInput.files;
     var fileReader = new FileReader();
     fileReader.onload = function () {
         let data = new Uint8Array(fileReader.result)
 
-        let colorModeValue = colorMode.selectedIndex;
+        var colorModeValue = parseInt(document.querySelector('input[name="colorMode"]:checked').value);
+
         if (colorModeValue < 3) {
             let resDataBase64 = wasm.processImageGb(colorModeValue, data);
             fileOutput.src = "data:image/png;base64," + resDataBase64;
@@ -30,12 +28,12 @@ convertButton.onclick = function () {
             fileOutput.src = "data:image/png;base64," + resDataBase64;
         } else if (colorModeValue <= 7) {
             let scalingVal = parseInt(scaling.value);
-            let lcdModeVal = lcdMode.selectedIndex;
+            let lcdModeVal = parseInt(document.querySelector('input[name="lcdMode"]:checked').value);
             let resDataBase64 = wasm.processImageGbc(scalingVal, lcdModeVal, colorModeValue - 4, data);
             fileOutput.src = "data:image/png;base64," + resDataBase64;
         } else {
             let scalingVal = parseInt(scaling.value);
-            let parVal = par.value;
+            let parVal = document.querySelector('input[name="par"]:checked').value;
             let explicitAspectRatio = false;
             if (parVal == "auto") {
                 parVal = 0;

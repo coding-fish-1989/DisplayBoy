@@ -6,8 +6,9 @@
     <meta name="description"
         content="Convert GB, GBC, and GBA screenshots to resemble the display of the actual device more closely.">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
     <link rel="icon" type="image/x-icon" href="img/favicon.png">
-    <link rel="stylesheet" href="css/pico.min.css">
+    <link rel="stylesheet" href="css/pico.slate.min.css">
     <title>DisplayBoy: GB, GBC, and GBA Display Filter</title>
     <style>
         .logoHeader {
@@ -35,7 +36,7 @@
     </style>
     <script>
         function updateForm() {
-            var index = document.getElementById('colorMode').selectedIndex;
+            var index = parseInt(document.querySelector('input[name="colorMode"]:checked').value);
             var gbCustomFormClass = document.getElementById('gbCustomForm').classList;
             var lcdModeFormClass = document.getElementById('lcdModeForm').classList;
             var scalingFormClass = document.getElementById('scalingForm').classList;
@@ -93,68 +94,91 @@
             <label for="fileInput">Select Image
                 <input type="file" id="fileInput" accept=".png,.jpg,.jpeg">
             </label>
-            <label for="colorMode">Color Mode
-                <select id="colorMode" name="colorMode" oninput="updateForm()">
-                    <option value="gb">GB</option>
-                    <option value="gbp">GBP</option>
-                    <option value="gbl">GBL</option>
-                    <option value="gbCustom">GB Custom</option>
-                    <option value="gbc">GBC</option>
-                    <option value="gba">GBA</option>
-                    <option value="gbaSp">GBA SP</option>
-                    <option value="gbaSpWhite">GBA SP White</option>
-                    <option value="crt">CRT</option>
-                </select>
-            </label>
-                <div id="gbCustomForm" class="grid invisible">
-                    <div>
-                        <label for="gbCustomBg">Background Color
-                            <input type="color" id="gbCustomBg" name="gbCustomBg" value="#aab513">
-                        </label>
-                    </div>
-                    <div>
-                        <label for="gbCustomFg">Foreground Color
-                            <input type="color" id="gbCustomFg" name="gbCustomFg" value="#134a07">
-                        </label>
-                        <output id="gbCustomFgOpacityDisplay" style="float:right">100</output>
-                        <label for="gbCustomFgOpacity">Opacity
-                            <input id="gbCustomFgOpacity" name="gbCustomFgOpacity" type="range" min="0" max="100" value="100" oninput="updateForm()">
-                        </label>
-                    </div>
-                </div>
-                <div id="lcdModeForm" class="invisible">
-                    <label for="lcdMode">LCD Mode
-                        <select id="lcdMode" name="lcdMode">
-                            <option value="sameboy">Sameboy</option>
-                            <option value="lcdv2">LCD Grid v2</option>
-                            <option value="off">Off</option>
-                        </select>
-                    </label>
-                </div>
-                <div id="scalingForm" class="invisible">
-                    <output id="scalingDisplay" style="float:right">5</output>
-                    <label for="scaling">Scale
-                        <input id="scaling" name="scaling" type="range" min="1" max="8" value="5" oninput="updateForm()">
-                    </label>
-                </div>
-                <div id="parForm" class="invisible">
-                    <label for="par">Pixel Aspect Ratio
-                        <select id="par" name="par">
-                            <option value="auto">Automatic</option>
-                            <option value="1:1">1:1 (Square)</option>
-                            <option value="8:7">8:7</option>
-                        </select>
-                    </label>
-                </div>
-
-                <button type="button" id="convertButton">Convert</button>
-                <small id="convError" style="color:red"></small>
+            <fieldset>
+                <legend>Device</legend>
+                <article>
+                    <input type="radio" id="gbColorMode" name="colorMode" value="0" checked>
+                    <label for="gbColorMode">GB</label>
+                    <input type="radio" id="gbpColorMode" name="colorMode" value="1">
+                    <label for="gbpColorMode">GBP</label>
+                    <input type="radio" id="gblColorMode" name="colorMode" value="2">
+                    <label for="gblColorMode">GBL</label>
+                    <input type="radio" id="gbCustomColorMode" name="colorMode" value="3">
+                    <label for="gbCustomColorMode">GB Custom</label>
+                </article>
+                <article>
+                    <input type="radio" id="gbcColorMode" name="colorMode" value="4">
+                    <label for="gbcColorMode">GBC</label>
+                    <input type="radio" id="gbaColorMode" name="colorMode" value="5">
+                    <label for="gbaColorMode">GBA</label>
+                    <input type="radio" id="gbaSpColorMode" name="colorMode" value="6">
+                    <label for="gbaSpColorMode">GBA SP</label>
+                    <input type="radio" id="gbaSpWhiteColorMode" name="colorMode" value="7">
+                    <label for="gbaSpWhiteColorMode">GBA SP White</label>
+                </article>
+                <article>
+                    <input type="radio" id="crtColorMode" name="colorMode" value="8">
+                    <label for="crtColorMode">CRT</label>
+                </article>
             </fieldset>
-            <img id="fileOutput" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Filtered Image">
-        </main>
-        <script>
-            updateForm();
-        </script>
-      <script src="./bootstrap.js"></script>
-    </body>
+            <div id="gbCustomForm" class="grid invisible">
+                <div>
+                    <label for="gbCustomBg">Background Color
+                        <input type="color" id="gbCustomBg" name="gbCustomBg" value="#aab513">
+                    </label>
+                </div>
+                <div>
+                    <label for="gbCustomFg">Foreground Color
+                        <input type="color" id="gbCustomFg" name="gbCustomFg" value="#134a07">
+                    </label>
+                    <output id="gbCustomFgOpacityDisplay" style="float:right">100</output>
+                    <label for="gbCustomFgOpacity">Opacity
+                        <input id="gbCustomFgOpacity" name="gbCustomFgOpacity" type="range" min="0" max="100"
+                            value="100" oninput="updateForm()">
+                    </label>
+                </div>
+            </div>
+            <div id="lcdModeForm" class="invisible">
+                <fieldset>
+                    <legend>LCD Mode</legend>
+                    <input type="radio" id="lcdModeSameboy" name="lcdMode" value="0" checked>
+                    <label for="lcdModeSameboy">Sameboy</label>
+                    <input type="radio" id="lcdModeLcdv2" name="lcdMode" value="1">
+                    <label for="lcdModeLcdv2">LCD Grid v2</label>
+                    <input type="radio" id="lcdModeOff" name="lcdMode" value="2">
+                    <label for="lcdModeOff">Off</label>
+                </fieldset>
+            </div>
+            <div id="scalingForm" class="invisible">
+                <output id="scalingDisplay" style="float:right">5</output>
+                <label for="scaling">Scale
+                    <input id="scaling" name="scaling" type="range" min="1" max="8" value="5" oninput="updateForm()">
+                </label>
+            </div>
+            <div id="parForm" class="invisible">
+                <fieldset>
+                    <legend>Pixel Aspect Ratio</legend>
+                    <input type="radio" id="parAuto" name="par" value="auto" checked>
+                    <label for="parAuto">Automatic</label>
+                    <input type="radio" id="par1x1" name="par" value="1:1">
+                    <label for="par1x1">1:1 (Square)</label>
+                    <input type="radio" id="par8x7" name="par" value="8:7">
+                    <label for="par8x7">8:7</label>
+                </fieldset>
+            </div>
+        </fieldset>
+        <button type="submit" id="convertButton">Convert</button>
+        <small id="convError" style="color:red"></small>
+        <img id="fileOutput" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+            alt="Filtered Image">
+    </main>
+    <script>
+        updateForm();
+        document.querySelectorAll('input[name="colorMode"]').forEach(function (input) {
+            input.addEventListener('input', updateForm);
+        });
+    </script>
+    <script src="./bootstrap.js"></script>
+</body>
+
 </html>
