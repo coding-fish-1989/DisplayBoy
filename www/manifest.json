@@ -1,7 +1,7 @@
 {
   "name": "DisplayBoy",
   "description": "Convert GB, GBC, and GBA screenshots to resemble the display of the actual device more closely.",
-  "start_url": "/",
+  "start_url": "/displayboy/",
   "lang": "en-US",
   "theme_color": "#666699",
   "display": "standalone",
