@@ -1,0 +1,35 @@
+{
+  "name": "DisplayBoy",
+  "description": "Convert GB, GBC, and GBA screenshots to resemble the display of the actual device more closely.",
+  "start_url": "/",
+  "lang": "en-US",
+  "theme_color": "#666699",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "img/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "img/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "img/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
