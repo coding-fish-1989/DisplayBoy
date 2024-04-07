@@ -36,7 +36,16 @@ extern "C" {
 }
 
 #[wasm_bindgen(js_name = processImageGb)]
-pub fn process_image_gb(mode: i32, data: Vec<u8>) -> String {
+pub fn process_image_gb(
+    mode: i32,
+    dither: bool,
+    brightness: f32,
+    contrast: f32,
+    invert: bool,
+    edge_enhancement_level: f32,
+    height_cap: i32,
+    data: Vec<u8>,
+) -> String {
     set_panic_hook();
 
     let img = image::load_from_memory(&data).unwrap();
@@ -78,8 +87,24 @@ pub fn process_image_gb(mode: i32, data: Vec<u8>) -> String {
         _ => gb,
     };
 
-    let src_scale = detect_src_scale(img.width(), img.height());
-    let result = gb::gb_mono(img.into_rgba8(), src_scale, prof);
+    let adjustment = gb::GbColorAdjustment {
+        dither: dither,
+        brightness: brightness,
+        contrast: contrast,
+        invert: invert,
+        edge_enhancement_level: edge_enhancement_level,
+    };
+
+    let src_scale = detect_src_scale(
+        img.width(),
+        img.height(),
+        if height_cap < 0 {
+            144
+        } else {
+            height_cap as u32
+        },
+    );
+    let result = gb::gb_mono(img.into_rgba8(), src_scale, &prof, &adjustment);
 
     let mut buf = Vec::new();
     let _ = result.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png);
@@ -91,6 +116,12 @@ pub fn process_image_gb_custom(
     fg_color: String,
     fg_alpha: i32,
     bg_color: String,
+    dither: bool,
+    brightness: f32,
+    contrast: f32,
+    invert: bool,
+    edge_enhancement_level: f32,
+    height_cap: i32,
     data: Vec<u8>,
 ) -> String {
     set_panic_hook();
@@ -107,8 +138,25 @@ pub fn process_image_gb_custom(
         background_g: i32::from_str_radix(&bg_color[3..5], 16).unwrap() as f32 / 255.0,
         background_b: i32::from_str_radix(&bg_color[5..7], 16).unwrap() as f32 / 255.0,
     };
-    let src_scale = detect_src_scale(img.width(), img.height());
-    let result = gb::gb_mono(img.into_rgba8(), src_scale, prof);
+
+    let adjustment = gb::GbColorAdjustment {
+        dither: dither,
+        brightness: brightness,
+        contrast: contrast,
+        invert: invert,
+        edge_enhancement_level: edge_enhancement_level,
+    };
+
+    let src_scale = detect_src_scale(
+        img.width(),
+        img.height(),
+        if height_cap < 0 {
+            144
+        } else {
+            height_cap as u32
+        },
+    );
+    let result = gb::gb_mono(img.into_rgba8(), src_scale, &prof, &adjustment);
 
     let mut buf = Vec::new();
     let _ = result.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png);
@@ -116,7 +164,13 @@ pub fn process_image_gb_custom(
 }
 
 #[wasm_bindgen(js_name = processImageGbc)]
-pub fn process_image_gbc(scale: u32, lcd_mode: u32, color_mode: u32, data: Vec<u8>) -> String {
+pub fn process_image_gbc(
+    scale: u32,
+    lcd_mode: u32,
+    color_mode: u32,
+    height_cap: i32,
+    data: Vec<u8>,
+) -> String {
     set_panic_hook();
 
     // Pokefan531's GBC Display Profile
@@ -192,8 +246,20 @@ pub fn process_image_gbc(scale: u32, lcd_mode: u32, color_mode: u32, data: Vec<u
         _ => gbc,
     };
 
+    let fallback_height = if height_cap < 0 {
+        match color_mode {
+            0 => 144,
+            1 => 160,
+            2 => 160,
+            3 => 160,
+            _ => 144,
+        }
+    } else {
+        height_cap as u32
+    };
+
     let img = image::load_from_memory(&data).unwrap();
-    let src_scale = detect_src_scale(img.width(), img.height());
+    let src_scale = detect_src_scale(img.width(), img.height(), fallback_height);
     let result = gbc::color_gb(img.into_rgba8(), src_scale, scale, lcd_mode, &prof);
 
     let mut buf = Vec::new();
@@ -206,12 +272,21 @@ pub fn process_image_crt(
     scale: u32,
     explicit_aspect_ratio: bool,
     pixel_aspect_ratio: f32,
+    height_cap: i32,
     data: Vec<u8>,
 ) -> String {
     set_panic_hook();
 
     let img = image::load_from_memory(&data).unwrap();
-    let src_scale = detect_src_scale(img.width(), img.height());
+    let src_scale = detect_src_scale(
+        img.width(),
+        img.height(),
+        if height_cap < 0 {
+            240
+        } else {
+            height_cap as u32
+        },
+    );
     let result = crt::crt(
         img.into_rgba8(),
         src_scale,

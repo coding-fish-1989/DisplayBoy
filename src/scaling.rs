@@ -21,14 +21,22 @@ use crate::shader_support;
 
 use image::RgbaImage;
 use shader_support::*;
+use wasm_bindgen::prelude::*;
 
 pub struct ScaleInfo {
     pub scale_x: f32,
     pub scale_y: f32,
     pub respect_input_aspect_ratio: bool,
+    pub detected: bool,
+    pub device_name: String,
 }
 
-pub fn detect_src_scale(width: u32, height: u32) -> ScaleInfo {
+#[wasm_bindgen(js_name = getSourceDeviceName)]
+pub fn get_source_device_name(width: u32, height: u32) -> String {
+    detect_src_scale(width, height, 240).device_name
+}
+
+pub fn detect_src_scale(width: u32, height: u32, fallback_height: u32) -> ScaleInfo {
     // Detect input resolution and infer the original image resolution
     let aspect_ratio = width as f32 / height as f32;
     if (aspect_ratio - (240.0 / 160.0)).abs() < 0.001 {
@@ -38,24 +46,39 @@ pub fn detect_src_scale(width: u32, height: u32) -> ScaleInfo {
             scale_x: scale,
             scale_y: scale,
             respect_input_aspect_ratio: false,
+            detected: true,
+            device_name: "GBA".to_string(),
         }
     } else if (aspect_ratio - (160.0 / 144.0)).abs() < 0.001 {
-        // GBC
+        // GB/GBC
         let scale = (width as f32 / 160.0).max(1.0);
         ScaleInfo {
             scale_x: scale,
             scale_y: scale,
             respect_input_aspect_ratio: false,
+            detected: true,
+            device_name: "GB/GBC".to_string(),
         }
     } else if (aspect_ratio - (256.0 / 224.0)).abs() < 0.001
         || (aspect_ratio - (256.0 / 240.0)).abs() < 0.01
     {
-        // Probably SNES or NES - raw resolution
+        // This is a bit confusing, but GB Camera has a resolution of 128 x 112,
+        // which is exactly the half of some NES/SNES resolution.
+        // It doesn't actually make any different in terms of how scales are calculated,
+        // but it is detected and labeled as such to not confuse the user.
+        let is_gb_camera = width == 128 && height == 112;
         let scale = (width as f32 / 256.0).max(1.0);
         ScaleInfo {
             scale_x: scale,
             scale_y: scale,
             respect_input_aspect_ratio: false,
+            detected: true,
+            device_name: if is_gb_camera {
+                "GB Camera"
+            } else {
+                "NES/SNES"
+            }
+            .to_string(),
         }
     } else if (aspect_ratio - (252.0 / 238.0)).abs() < 0.001 {
         // Probably NES - raw resolution
@@ -65,6 +88,8 @@ pub fn detect_src_scale(width: u32, height: u32) -> ScaleInfo {
             scale_x: scale,
             scale_y: scale,
             respect_input_aspect_ratio: false,
+            detected: true,
+            device_name: "NES".to_string(),
         }
     } else if (aspect_ratio - (240.0 / 224.0)).abs() < 0.001
         || (aspect_ratio - (240.0 / 238.0)).abs() < 0.001
@@ -76,6 +101,8 @@ pub fn detect_src_scale(width: u32, height: u32) -> ScaleInfo {
             scale_x: scale,
             scale_y: scale,
             respect_input_aspect_ratio: false,
+            detected: true,
+            device_name: "NES".to_string(),
         }
     } else if (aspect_ratio - (64.0 / 49.0)).abs() < 0.001
         || (aspect_ratio - (8.0 / 7.0)).abs() < 0.001
@@ -85,6 +112,8 @@ pub fn detect_src_scale(width: u32, height: u32) -> ScaleInfo {
             scale_x: width as f32 / 256.0,
             scale_y: height as f32 / 224.0,
             respect_input_aspect_ratio: true,
+            detected: true,
+            device_name: "CRT (224) - PAR (8:7)".to_string(),
         }
     } else if (aspect_ratio - (128.0 / 105.0)).abs() < 0.001
         || (aspect_ratio - (16.0 / 15.0)).abs() < 0.001
@@ -94,6 +123,8 @@ pub fn detect_src_scale(width: u32, height: u32) -> ScaleInfo {
             scale_x: width as f32 / 256.0,
             scale_y: height as f32 / 240.0,
             respect_input_aspect_ratio: true,
+            detected: true,
+            device_name: "CRT (240) - PAR (8:7)".to_string(),
         }
     } else if width == 512 && (height == 240 || height == 224) {
         // agg23's SNES core support
@@ -102,14 +133,17 @@ pub fn detect_src_scale(width: u32, height: u32) -> ScaleInfo {
             scale_x: 2.0,
             scale_y: 1.0,
             respect_input_aspect_ratio: false,
+            detected: true,
+            device_name: "SNES (agg23)".to_string(),
         }
     } else {
-        // Fallback to 240p if too large
-        let scale = (height as f32 / 240.0).max(1.0);
+        let scale = (height as f32 / fallback_height as f32).max(1.0);
         ScaleInfo {
             scale_x: scale,
             scale_y: scale,
             respect_input_aspect_ratio: false,
+            detected: false,
+            device_name: "Unknown".to_string(),
         }
     }
 }

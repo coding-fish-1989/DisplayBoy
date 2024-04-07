@@ -16,6 +16,9 @@ Written in Rust, compiled to WASM. All code runs locally on your browser, nothin
 - GBA SP White (a variant of GBA SP mode)
 - CRT
 
+## GB Camera Mode
+This mode is used to apply similar effects to the GB Camera, such as dithering, brightness, contrast, and edge enhancements. It can be used to make modern photos resemble those shot using the GB Camera.
+
 ## Building
 ```
 wasm-pack build

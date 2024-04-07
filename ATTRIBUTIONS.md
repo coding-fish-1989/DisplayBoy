@@ -1,7 +1,7 @@
 DisplayBoy Attributions
 ===
 
-SameBoy LCD shader
+SameBoy LCD shader/GB Camera Edge Enhancement
 ---
 Expat License
 

@@ -20,8 +20,8 @@
 use crate::{scaling, shader_support};
 
 use image::{Luma, Rgb, Rgba, RgbaImage};
-use shader_support::*;
 use scaling::*;
+use shader_support::*;
 
 #[inline(always)]
 fn load_alpha_checked(buff: &AlphaImage, x: i32, y: i32, width: u32, height: u32) -> f32 {
@@ -29,6 +29,104 @@ fn load_alpha_checked(buff: &AlphaImage, x: i32, y: i32, width: u32, height: u32
         return 0.0;
     }
     buff.get_pixel(x as u32, y as u32)[0]
+}
+
+#[inline(always)]
+fn apply_threshold_kernel(
+    l: f32,
+    x: u32,
+    y: u32,
+    kernel: &[[[f32; 3]; 4]; 4],
+    adjustment: &GbColorAdjustment,
+) -> f32 {
+    let x = x % 4;
+    let y = y % 4;
+    let thresholds = kernel[x as usize][y as usize];
+    if l <= thresholds[0] {
+        if adjustment.invert {
+            0.07
+        } else {
+            3.0 / 3.0
+        }
+    } else if l <= thresholds[1] {
+        if adjustment.invert {
+            1.0 / 3.0
+        } else {
+            2.0 / 3.0
+        }
+    } else if l <= thresholds[2] {
+        if adjustment.invert {
+            2.0 / 3.0
+        } else {
+            1.0 / 3.0
+        }
+    } else {
+        if adjustment.invert {
+            3.0 / 3.0
+        } else {
+            0.07
+        }
+    }
+}
+
+#[inline(always)]
+fn apply_color_adjustments_threshold(
+    mid_threshold: f32,
+    adjustment: &GbColorAdjustment,
+) -> [f32; 3] {
+    // Input threshold is between 0 and 1, and this will adjust it to the range of 0.25 and 0.75.
+    // This is because this is trying to quantize color to 4 colors, and the lower quantization level should be 0.25 with contrast of 1 and brightness of 1.
+    let threshold = (mid_threshold - 0.5) * 0.25 + 0.5;
+    let range = 0.25 / adjustment.contrast.max(0.01);
+    let border_error = 0.03;
+    [
+        ((threshold - range + border_error) / adjustment.brightness).clamp(0.0, 1.0),
+        ((threshold + border_error) / adjustment.brightness).clamp(0.0, 1.0),
+        ((threshold + range + border_error) / adjustment.brightness).clamp(0.0, 1.0),
+    ]
+}
+
+#[inline(always)]
+fn threshold_bayer_dither(x: u32, y: u32, adjustment: &GbColorAdjustment) -> [f32; 3] {
+    // 4x4 Bayer
+    // https://en.wikipedia.org/wiki/Ordered_dithering
+    // Not exactly sure if this is what GB Camera uses, but perceptually it looks similar.
+    let dither = [
+        [0.0, 0.5, 0.125, 0.625],
+        [0.75, 0.25, 0.875, 0.375],
+        [0.1875, 0.6875, 0.0625, 0.5625],
+        [0.9375, 0.4375, 0.8125, 0.3125],
+    ];
+    let threshold = dither[x as usize % 4][y as usize % 4];
+    apply_color_adjustments_threshold(threshold, adjustment)
+}
+
+fn build_threshold_bayer_dither_kernel(adjustment: &GbColorAdjustment) -> [[[f32; 3]; 4]; 4] {
+    let mut kernel = [[[0.0; 3]; 4]; 4];
+    for y in 0..4 {
+        for x in 0..4 {
+            kernel[x][y] = threshold_bayer_dither(x as u32, y as u32, adjustment);
+        }
+    }
+    kernel
+}
+
+fn build_threshold_default_kernel(adjustment: &GbColorAdjustment) -> [[[f32; 3]; 4]; 4] {
+    let mut kernel = [[[0.0; 3]; 4]; 4];
+    for y in 0..4 {
+        for x in 0..4 {
+            kernel[x][y] = apply_color_adjustments_threshold(0.5, adjustment)
+        }
+    }
+    kernel
+}
+
+fn build_threshold_kernel(adjustment: &GbColorAdjustment) -> [[[f32; 3]; 4]; 4] {
+    if adjustment.dither {
+        build_threshold_bayer_dither_kernel(adjustment)
+    } else {
+        build_threshold_default_kernel(adjustment)
+    }
 }
 
 fn bilinear_scale_alpha(
@@ -66,19 +164,6 @@ fn bilinear_scale_alpha(
 }
 
 #[inline(always)]
-fn quantize_gb(l: f32) -> f32 {
-    let border_error = 0.03;
-    if l <= 0.25 + border_error {
-        return 1.0;
-    } else if l <= 0.5 + border_error {
-        return 0.66666667;
-    } else if l <= 0.75 + border_error {
-        return 0.33333333;
-    }
-    0.07
-}
-
-#[inline(always)]
 fn apply_kernel_3(values: &[f32; 3], kernel: [f32; 2]) -> f32 {
     let mut g = 0.0;
     g += values[0] * kernel[0];
@@ -110,7 +195,20 @@ pub struct GbDisplayProfile {
     pub background_b: f32,
 }
 
-pub fn gb_mono(img: RgbaImage, src_scale: ScaleInfo, profile: GbDisplayProfile) -> RgbaImage {
+pub struct GbColorAdjustment {
+    pub dither: bool,
+    pub brightness: f32,
+    pub contrast: f32,
+    pub invert: bool,
+    pub edge_enhancement_level: f32,
+}
+
+pub fn gb_mono(
+    img: RgbaImage,
+    src_scale: ScaleInfo,
+    profile: &GbDisplayProfile,
+    adjustment: &GbColorAdjustment,
+) -> RgbaImage {
     let src_width = img.width();
     let src_height = img.height();
 
@@ -134,7 +232,7 @@ pub fn gb_mono(img: RgbaImage, src_scale: ScaleInfo, profile: GbDisplayProfile) 
         calculate_scaled_buffer_size(src_width, src_height, &src_scale);
 
     // Quantize to alpha, downscale to real device resolution, and store
-    let mut buff = AlphaImage::new(target_width, target_height);
+    let mut quantized_img = AlphaImage::new(target_width, target_height);
     let x_target_half_texel = 1.0 / (target_width as f32 * 2.0);
     let y_target_half_texel = 1.0 / (target_height as f32 * 2.0);
     for y in 0..target_height {
@@ -152,9 +250,43 @@ pub fn gb_mono(img: RgbaImage, src_scale: ScaleInfo, profile: GbDisplayProfile) 
             } else {
                 l.powf(1.0 / 3.0) * 116.0 - 16.0
             };
-            let l = l / 100.0;
-            let alpha = quantize_gb(l) * fg_opacity;
-            buff.put_pixel(x, y, Luma([alpha]));
+            let l = (l / 100.0).clamp(0.0, 1.0);
+            quantized_img.put_pixel(x, y, Luma([l]));
+        }
+    }
+
+    // Apply adjustments
+    let mut adjusted_img = AlphaImage::new(target_width, target_height);
+    {
+        let threshold_kernel = build_threshold_kernel(adjustment);
+        let edge_enhancement_level = adjustment.edge_enhancement_level;
+        let mut y_up = 0;
+        for y in 0..target_height {
+            let y_down = (y + 1).min(target_height - 1);
+
+            let mut x_left = 0;
+            for x in 0..target_width {
+                let mut l = quantized_img.get_pixel(x, y)[0];
+
+                // Apply edge enhancement
+                // https://github.com/LIJI32/SameBoy/blob/master/Core/camera.c
+                if edge_enhancement_level > 0.0 {
+                    let x_right = (x + 1).min(target_width - 1);
+                    l += (l * 4.0) * edge_enhancement_level;
+                    l -= quantized_img.get_pixel(x_left, y)[0] * edge_enhancement_level;
+                    l -= quantized_img.get_pixel(x_right, y)[0] * edge_enhancement_level;
+                    l -= quantized_img.get_pixel(x, y_up)[0] * edge_enhancement_level;
+                    l -= quantized_img.get_pixel(x, y_down)[0] * edge_enhancement_level;
+                }
+
+                let alpha =
+                    apply_threshold_kernel(l, x, y, &threshold_kernel, &adjustment) * fg_opacity;
+                adjusted_img.put_pixel(x, y, Luma([alpha]));
+
+                x_left = x;
+            }
+
+            y_up = y;
         }
     }
 
@@ -189,7 +321,7 @@ pub fn gb_mono(img: RgbaImage, src_scale: ScaleInfo, profile: GbDisplayProfile) 
             bg_ping_buff.put_pixel(
                 x + margin as u32,
                 y + margin as u32,
-                *buff.get_pixel(x / scale as u32, y / scale as u32),
+                *adjusted_img.get_pixel(x / scale as u32, y / scale as u32),
             );
         }
     }

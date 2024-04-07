@@ -59,11 +59,16 @@
             margin-left: auto;
             margin-right: auto;
         }
+
+        .headerSwitch {
+            margin-bottom: 20px;
+        }
     </style>
     <script>
         function updateForm() {
             var index = parseInt(document.querySelector('input[name="colorMode"]:checked').value);
             var gbCustomFormClass = document.getElementById('gbCustomForm').classList;
+            var gbAdjustmentFormClass = document.getElementById('gbAdjustmentForm').classList;
             var lcdModeFormClass = document.getElementById('lcdModeForm').classList;
             var scalingFormClass = document.getElementById('scalingForm').classList;
             var parClass = document.getElementById('parForm').classList;
@@ -80,8 +85,10 @@
             }
             if (index < 4) {
                 scalingFormClass.add('invisible');
+                gbAdjustmentFormClass.remove('invisible');
             } else {
                 scalingFormClass.remove('invisible');
+                gbAdjustmentFormClass.add('invisible');
             }
             if (index != 8) {
                 parClass.add('invisible');
@@ -91,6 +98,18 @@
 
             document.getElementById('gbCustomFgOpacityDisplay').value = document.getElementById('gbCustomFgOpacity').value
             document.getElementById('scalingDisplay').value = document.getElementById('scaling').value
+            document.getElementById('brightnessDisplay').value = document.getElementById('brightness').value
+            document.getElementById('contrastDisplay').value = document.getElementById('contrast').value
+            document.getElementById('edgeEnhancementLevelDisplay').value = document.getElementById('edgeEnhancementLevel').value
+
+            let gbCameraMode = document.getElementById('gbCameraMode').checked;
+            let gbAdjustmentFormContent = document.getElementById('gbAdjustmentFormContent');
+
+            if (gbCameraMode) {
+                gbAdjustmentFormContent.classList.remove('invisible');
+            } else {
+                gbAdjustmentFormContent.classList.add('invisible');
+            }
         }
     </script>
 </head>
@@ -117,11 +136,45 @@
             closely.</p>
         <hr>
         <fieldset>
-            <label for="fileInput">Select Image
+            <label for="fileInput">Source Image
                 <input type="file" id="fileInput" accept=".png,.jpg,.jpeg">
+                <small id="deviceName"></small>
             </label>
+            <div id="imageHeightCap" class="invisible">
+                <legend>Maximum Image Height</legend>
+                <fieldset>
+                    <article>
+                        <div class="selection-container">
+                            <span>
+                                <input type="radio" id="imageHeightCapNone" name="imageHeightCap" value="auto" checked>
+                                <label for="imageHeightCapNone">Automatic</label>
+                            </span>
+                            <span>
+                                <input type="radio" id="imageHeightCap144" name="imageHeightCap" value="144">
+                                <label for="imageHeightCap144">144 (GB/GBC)</label>
+                            </span>
+                            <span>
+                                <input type="radio" id="imageHeightCap112" name="imageHeightCap" value="112">
+                                <label for="imageHeightCap112">112 (GB Camera)</label>
+                            </span>
+                            <span>
+                                <input type="radio" id="imageHeightCap160" name="imageHeightCap" value="160">
+                                <label for="imageHeightCap160">160 (GBA)</label>
+                            </span>
+                            <span>
+                                <input type="radio" id="imageHeightCap240" name="imageHeightCap" value="240">
+                                <label for="imageHeightCap240">240 (CRT)</label>
+                            </span>
+                            <span>
+                                <input type="radio" id="imageHeightCap224" name="imageHeightCap" value="224">
+                                <label for="imageHeightCap224">224 (CRT)</label>
+                            </span>
+                        </div>
+                    </article>
+                </fieldset>
+            </div>
             <fieldset>
-                <legend>Device</legend>
+                <legend>Filter</legend>
                 <article>
                     <div class="selection-container">
                         <span>
@@ -172,39 +225,88 @@
                 </article>
             </fieldset>
             <div id="gbCustomForm" class="grid invisible">
-                <div>
-                    <label for="gbCustomBg">Background Color
-                        <input type="color" id="gbCustomBg" name="gbCustomBg" value="#aab513">
-                    </label>
-                </div>
-                <div>
-                    <label for="gbCustomFg">Foreground Color
-                        <input type="color" id="gbCustomFg" name="gbCustomFg" value="#134a07">
-                    </label>
-                    <output id="gbCustomFgOpacityDisplay" style="float:right">100</output>
-                    <label for="gbCustomFgOpacity">Opacity
-                        <input id="gbCustomFgOpacity" name="gbCustomFgOpacity" type="range" min="0" max="100"
-                            value="100" oninput="updateForm()">
-                    </label>
-                </div>
+                <fieldset>
+                    <article>
+                        <div>
+                            <label for="gbCustomBg">Background Color
+                                <input type="color" id="gbCustomBg" name="gbCustomBg" value="#aab513">
+                            </label>
+                        </div>
+                        <div>
+                            <label for="gbCustomFg">Foreground Color
+                                <input type="color" id="gbCustomFg" name="gbCustomFg" value="#134a07">
+                            </label>
+                            <output id="gbCustomFgOpacityDisplay" style="float:right">100</output>
+                            <label for="gbCustomFgOpacity">Opacity
+                                <input id="gbCustomFgOpacity" name="gbCustomFgOpacity" type="range" min="0" max="100"
+                                    value="100" oninput="updateForm()">
+                            </label>
+                        </div>
+                    </article>
+                </fieldset>
+            </div>
+            <div id="gbAdjustmentForm" class="invisible">
+                <label for="gbCameraMode" class="headerSwitch">
+                    <input type="checkbox" id="gbCameraMode" name="gbCameraMode" role="switch" oninput="updateForm()">
+                    GB Camera Mode
+                </label>
+                <fieldset id="gbAdjustmentFormContent" class="invisible">
+                    <article>
+                        <div>
+                            <label for="dither">
+                                <input type="checkbox" id="dither" name="dither" role="switch" checked>
+                                Dither
+                            </label>
+                        </div>
+                        <div>
+                            <output id="brightnessDisplay" style="float:right">0</output>
+                            <label for="brightness">Brightness
+                                <input id="brightness" name="brightness" type="range" min="-100" max="100" value="0"
+                                    oninput="updateForm()">
+                            </label>
+                        </div>
+                        <div>
+                            <output id="contrastDisplay" style="float:right">0</output>
+                            <label for="contrast">Contrast
+                                <input id="contrast" name="contrast" type="range" min="-100" max="100" value="0"
+                                    oninput="updateForm()">
+                            </label>
+                        </div>
+                        <div>
+                            <output id="edgeEnhancementLevelDisplay" style="float:right">0</output>
+                            <label for="edgeEnhancementLevel">Edge Enhancement
+                                <input id="edgeEnhancementLevel" name="edgeEnhancementLevel" type="range" min="0"
+                                    max="9" value="0" oninput="updateForm()">
+                            </label>
+                        </div>
+                        <div>
+                            <label for="invert">
+                                <input type="checkbox" id="invert" name="invert" role="switch">
+                                Invert
+                            </label>
+                        </div>
+                    </article>
+                </fieldset>
             </div>
             <div id="lcdModeForm" class="invisible">
+                <legend>LCD Mode</legend>
                 <fieldset>
-                    <legend>LCD Mode</legend>
-                    <div class="selection-container">
-                        <span>
-                            <input type="radio" id="lcdModeSameboy" name="lcdMode" value="0" checked>
-                            <label for="lcdModeSameboy">Sameboy</label>
-                        </span>
-                        <span>
-                            <input type="radio" id="lcdModeLcdv2" name="lcdMode" value="1">
-                            <label for="lcdModeLcdv2">LCD Grid v2</label>
-                        </span>
-                        <span>
-                            <input type="radio" id="lcdModeOff" name="lcdMode" value="2">
-                            <label for="lcdModeOff">Off</label>
-                        </span>
-                    </div>
+                    <article>
+                        <div class="selection-container">
+                            <span>
+                                <input type="radio" id="lcdModeSameboy" name="lcdMode" value="0" checked>
+                                <label for="lcdModeSameboy">Sameboy</label>
+                            </span>
+                            <span>
+                                <input type="radio" id="lcdModeLcdv2" name="lcdMode" value="1">
+                                <label for="lcdModeLcdv2">LCD Grid v2</label>
+                            </span>
+                            <span>
+                                <input type="radio" id="lcdModeOff" name="lcdMode" value="2">
+                                <label for="lcdModeOff">Off</label>
+                            </span>
+                        </div>
+                    </article>
                 </fieldset>
             </div>
             <div id="scalingForm" class="invisible">
@@ -214,26 +316,28 @@
                 </label>
             </div>
             <div id="parForm" class="invisible">
+                <legend>Pixel Aspect Ratio</legend>
                 <fieldset>
-                    <legend>Pixel Aspect Ratio</legend>
-                    <div class="selection-container">
-                        <span>
-                            <input type="radio" id="parAuto" name="par" value="auto" checked>
-                            <label for="parAuto">Automatic</label>
-                        </span>
-                        <span>
-                            <input type="radio" id="par1x1" name="par" value="1:1">
-                            <label for="par1x1">1:1 (Square)</label>
-                        </span>
-                        <span>
-                            <input type="radio" id="par8x7" name="par" value="8:7">
-                            <label for="par8x7">8:7</label>
-                        </span>
-                    </div>
+                    <article>
+                        <div class="selection-container">
+                            <span>
+                                <input type="radio" id="parAuto" name="par" value="auto" checked>
+                                <label for="parAuto">Automatic</label>
+                            </span>
+                            <span>
+                                <input type="radio" id="par1x1" name="par" value="1:1">
+                                <label for="par1x1">1:1 (Square)</label>
+                            </span>
+                            <span>
+                                <input type="radio" id="par8x7" name="par" value="8:7">
+                                <label for="par8x7">8:7</label>
+                            </span>
+                        </div>
+                    </article>
                 </fieldset>
             </div>
         </fieldset>
-        <button type="submit" id="convertButton">Convert</button>
+        <button type="submit" id="convertButton" disabled>Convert</button>
         <small id="convError" style="color:red"></small>
         <img id="fileOutput" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
             alt="Filtered Image">
