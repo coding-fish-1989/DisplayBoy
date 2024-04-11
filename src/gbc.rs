@@ -73,12 +73,38 @@ fn color_correct(c: Rgb<f32>, p: &DisplayProfile) -> Rgb<f32> {
 
 pub fn color_gb(
     img: RgbaImage,
+    exif_orientation: u32,
     src_scale: ScaleInfo,
     scale: u32,
     lcd_mode: u32,
     prof: &DisplayProfile,
 ) -> RgbaImage {
-    let src_img = prepare_src_image(&img, &src_scale);
+    let (src_width, src_height) =
+        exif_orientation_dimension(img.width(), img.height(), exif_orientation);
+
+    let (target_width, target_height) =
+        calculate_scaled_buffer_size(src_width, src_height, &src_scale);
+    let mut src_img = FloatImage::new(target_width, target_height);
+    let x_target_half_texel = 1.0 / (target_width as f32 * 2.0);
+    let y_target_half_texel = 1.0 / (target_height as f32 * 2.0);
+    for y in 0..target_height {
+        for x in 0..target_width {
+            let x_coord = x as f32 / target_width as f32 + x_target_half_texel;
+            let y_coord = y as f32 / target_height as f32 + y_target_half_texel;
+            let x_src = (x_coord * src_width as f32).floor() as u32;
+            let y_src = (y_coord * src_height as f32).floor() as u32;
+            let (x_src, y_src) = exif_orientation_transform_coordinate(
+                src_width,
+                src_height,
+                exif_orientation,
+                x_src as i32,
+                y_src as i32,
+            );
+            let p = img.get_pixel(x_src as u32, y_src as u32);
+            let p = rgba_u8_to_rgb_f32(*p).to_linear();
+            src_img.put_pixel(x, y, p);
+        }
+    }
 
     let src_width = src_img.width();
     let src_height = src_img.height();

@@ -25,6 +25,7 @@ mod shader_support;
 mod utils;
 
 use base64::{engine::general_purpose, Engine as _};
+use exif::*;
 use scaling::*;
 use std::io::Cursor;
 use utils::set_panic_hook;
@@ -33,6 +34,20 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 extern "C" {
     fn alert(s: &str);
+}
+
+fn parse_exif_orientation(data: &Vec<u8>) -> u32 {
+    let exifreader = exif::Reader::new();
+    let exif = exifreader
+        .read_from_container(&mut Cursor::new(&data))
+        .unwrap();
+    match exif.get_field(Tag::Orientation, In::PRIMARY) {
+        Some(orientation) => match orientation.value.get_uint(0) {
+            Some(v @ 1..=8) => v,
+            _ => 1,
+        },
+        None => 1,
+    }
 }
 
 #[wasm_bindgen(js_name = processImageGb)]
@@ -48,7 +63,9 @@ pub fn process_image_gb(
 ) -> String {
     set_panic_hook();
 
+    let exif_orientation = parse_exif_orientation(&data);
     let img = image::load_from_memory(&data).unwrap();
+    let (width, height) = exif_orientation_dimension(img.width(), img.height(), exif_orientation);
 
     let gb = gb::GbDisplayProfile {
         foreground_r: 19.0 / 255.0,
@@ -96,15 +113,21 @@ pub fn process_image_gb(
     };
 
     let src_scale = detect_src_scale(
-        img.width(),
-        img.height(),
+        width,
+        height,
         if height_cap < 0 {
             144
         } else {
             height_cap as u32
         },
     );
-    let result = gb::gb_mono(img.into_rgba8(), src_scale, &prof, &adjustment);
+    let result = gb::gb_mono(
+        img.into_rgba8(),
+        exif_orientation,
+        src_scale,
+        &prof,
+        &adjustment,
+    );
 
     let mut buf = Vec::new();
     let _ = result.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png);
@@ -127,6 +150,8 @@ pub fn process_image_gb_custom(
     set_panic_hook();
 
     let img = image::load_from_memory(&data).unwrap();
+    let exif_orientation = parse_exif_orientation(&data);
+    let (width, height) = exif_orientation_dimension(img.width(), img.height(), exif_orientation);
 
     // Color input is in the format #RRGGBB
     let prof = gb::GbDisplayProfile {
@@ -148,15 +173,21 @@ pub fn process_image_gb_custom(
     };
 
     let src_scale = detect_src_scale(
-        img.width(),
-        img.height(),
+        width,
+        height,
         if height_cap < 0 {
             144
         } else {
             height_cap as u32
         },
     );
-    let result = gb::gb_mono(img.into_rgba8(), src_scale, &prof, &adjustment);
+    let result = gb::gb_mono(
+        img.into_rgba8(),
+        exif_orientation,
+        src_scale,
+        &prof,
+        &adjustment,
+    );
 
     let mut buf = Vec::new();
     let _ = result.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png);
@@ -258,9 +289,19 @@ pub fn process_image_gbc(
         height_cap as u32
     };
 
+    let exif_orientation = parse_exif_orientation(&data);
     let img = image::load_from_memory(&data).unwrap();
-    let src_scale = detect_src_scale(img.width(), img.height(), fallback_height);
-    let result = gbc::color_gb(img.into_rgba8(), src_scale, scale, lcd_mode, &prof);
+    let (width, height) = exif_orientation_dimension(img.width(), img.height(), exif_orientation);
+
+    let src_scale = detect_src_scale(width, height, fallback_height);
+    let result = gbc::color_gb(
+        img.into_rgba8(),
+        exif_orientation,
+        src_scale,
+        scale,
+        lcd_mode,
+        &prof,
+    );
 
     let mut buf = Vec::new();
     let _ = result.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png);
@@ -277,10 +318,13 @@ pub fn process_image_crt(
 ) -> String {
     set_panic_hook();
 
+    let exif_orientation = parse_exif_orientation(&data);
     let img = image::load_from_memory(&data).unwrap();
+    let (width, height) = exif_orientation_dimension(img.width(), img.height(), exif_orientation);
+
     let src_scale = detect_src_scale(
-        img.width(),
-        img.height(),
+        width,
+        height,
         if height_cap < 0 {
             240
         } else {
@@ -289,6 +333,7 @@ pub fn process_image_crt(
     );
     let result = crt::crt(
         img.into_rgba8(),
+        exif_orientation,
         src_scale,
         scale,
         explicit_aspect_ratio,

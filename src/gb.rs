@@ -205,12 +205,13 @@ pub struct GbColorAdjustment {
 
 pub fn gb_mono(
     img: RgbaImage,
+    exif_orientation: u32,
     src_scale: ScaleInfo,
     profile: &GbDisplayProfile,
     adjustment: &GbColorAdjustment,
 ) -> RgbaImage {
-    let src_width = img.width();
-    let src_height = img.height();
+    let (src_width, src_height) =
+        exif_orientation_dimension(img.width(), img.height(), exif_orientation);
 
     // Color configurations
     let fg = Rgb::<f32>([
@@ -242,7 +243,14 @@ pub fn gb_mono(
             let y_coord = y as f32 / target_height as f32 + y_target_half_texel;
             let x_src = (x_coord * src_width as f32).floor() as u32;
             let y_src = (y_coord * src_height as f32).floor() as u32;
-            let c = img.get_pixel(x_src, y_src);
+            let (x_src, y_src) = exif_orientation_transform_coordinate(
+                src_width,
+                src_height,
+                exif_orientation,
+                x_src as i32,
+                y_src as i32,
+            );
+            let c = img.get_pixel(x_src as u32, y_src as u32);
             let c = rgba_u8_to_rgb_f32(*c).to_linear();
             let l = c.luminance();
             let l = if l <= (216.0 / 24389.0) {

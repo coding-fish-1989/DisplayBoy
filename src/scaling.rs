@@ -17,10 +17,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::shader_support;
+use crate::utils;
 
-use image::RgbaImage;
-use shader_support::*;
+use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
 pub struct ScaleInfo {
@@ -33,6 +32,8 @@ pub struct ScaleInfo {
 
 #[wasm_bindgen(js_name = getSourceDeviceName)]
 pub fn get_source_device_name(width: u32, height: u32) -> String {
+    set_panic_hook();
+
     detect_src_scale(width, height, 240).device_name
 }
 
@@ -165,25 +166,38 @@ pub fn calculate_scaled_buffer_size(width: u32, height: u32, scale: &ScaleInfo) 
     (width, height)
 }
 
-pub fn prepare_src_image(img: &RgbaImage, src_scale: &ScaleInfo) -> FloatImage {
-    let src_width = img.width();
-    let src_height = img.height();
-
-    let (target_width, target_height) =
-        calculate_scaled_buffer_size(src_width, src_height, src_scale);
-    let mut buff = FloatImage::new(target_width, target_height);
-    let x_target_half_texel = 1.0 / (target_width as f32 * 2.0);
-    let y_target_half_texel = 1.0 / (target_height as f32 * 2.0);
-    for y in 0..target_height {
-        for x in 0..target_width {
-            let x_coord = x as f32 / target_width as f32 + x_target_half_texel;
-            let y_coord = y as f32 / target_height as f32 + y_target_half_texel;
-            let x_src = (x_coord * src_width as f32).floor() as u32;
-            let y_src = (y_coord * src_height as f32).floor() as u32;
-            let p = img.get_pixel(x_src, y_src);
-            let p = rgba_u8_to_rgb_f32(*p).to_linear();
-            buff.put_pixel(x, y, p);
-        }
+pub fn exif_orientation_dimension(width: u32, height: u32, orientation: u32) -> (u32, u32) {
+    match orientation {
+        1 => (width, height),
+        2 => (width, height),
+        3 => (width, height),
+        4 => (width, height),
+        5 => (height, width),
+        6 => (height, width),
+        7 => (height, width),
+        8 => (height, width),
+        _ => (width, height),
     }
-    buff
+}
+
+#[inline(always)]
+pub fn exif_orientation_transform_coordinate(
+    width: u32,
+    height: u32,
+    orientation: u32,
+    x: i32,
+    y: i32,
+) -> (i32, i32) {
+    let (width, height) = (width as i32, height as i32);
+    match orientation {
+        1 => (x, y),
+        2 => (width - x - 1, y),
+        3 => (width - x - 1, height - y - 1),
+        4 => (x, height - y - 1),
+        5 => (y, x),
+        6 => (y, width - x - 1),
+        7 => (height - y - 1, width - x - 1),
+        8 => (height - y - 1, x),
+        _ => (x, y),
+    }
 }

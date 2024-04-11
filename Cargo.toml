@@ -17,6 +17,7 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 image = "0.25.0"
 base64 = "0.22.0"
 fast-math = "0.1.1"
+kamadak-exif = "0.5.5"
 
 [profile.release]
 opt-level = 3

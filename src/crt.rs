@@ -137,6 +137,7 @@ fn apply_lut_rgb3d(col: Rgba<f32>, lut: &[Rgb<f32>; 32 * 32 * 32]) -> Rgb<f32> {
 
 pub fn crt(
     img: RgbaImage,
+    exif_orientation: u32,
     src_scale: ScaleInfo,
     scale: u32,
     explicit_aspect_ratio: bool,
@@ -173,8 +174,8 @@ pub fn crt(
         apply_lut_rgb3d(p, &lut)
     };
 
-    let (src_width, src_height) = (img.width(), img.height());
-
+    let (src_width, src_height) =
+        exif_orientation_dimension(img.width(), img.height(), exif_orientation);
     let (target_width, target_height) =
         calculate_scaled_buffer_size(src_width, src_height, &src_scale);
 
@@ -226,6 +227,13 @@ pub fn crt(
                 (y as i32 - top_margin as i32) as f32 / target_height as f32 + y_target_half_texel;
             let x_src = (x_coord * src_width as f32).floor() as i32;
             let y_src = (y_coord * src_height as f32).floor() as i32;
+            let (x_src, y_src) = exif_orientation_transform_coordinate(
+                src_width,
+                src_height,
+                exif_orientation,
+                x_src,
+                y_src,
+            );
             buff.put_pixel(x, y, load_buff(x_src, y_src));
         }
     }
