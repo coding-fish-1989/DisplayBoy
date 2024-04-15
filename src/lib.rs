@@ -38,10 +38,14 @@ extern "C" {
 
 fn parse_exif_orientation(data: &Vec<u8>) -> u32 {
     let exifreader = exif::Reader::new();
-    let exif = exifreader
-        .read_from_container(&mut Cursor::new(&data))
-        .unwrap();
-    match exif.get_field(Tag::Orientation, In::PRIMARY) {
+    let exif_result = exifreader.read_from_container(&mut Cursor::new(&data));
+    if exif_result.is_err() {
+        return 1;
+    }
+    match exif_result
+        .unwrap()
+        .get_field(Tag::Orientation, In::PRIMARY)
+    {
         Some(orientation) => match orientation.value.get_uint(0) {
             Some(v @ 1..=8) => v,
             _ => 1,
