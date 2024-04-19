@@ -140,6 +140,25 @@
                 <input type="file" id="fileInput" accept=".png,.jpg,.jpeg">
                 <small id="deviceName"></small>
             </label>
+            <div id="imageDownsampleMethod" class="invisible">
+                <legend>Downsample Method</legend>
+                <fieldset>
+                    <article>
+                        <div class="selection-container">
+                            <span>
+                                <input type="radio" id="imageDownsampleMethodBilinear" name="imageDownsampleMethod"
+                                    value="bilinear" checked>
+                                <label for="imageDownsampleMethodBilinear">Bilinear</label>
+                            </span>
+                            <span>
+                                <input type="radio" id="imageDownsampleMethodNearest" name="imageDownsampleMethod"
+                                    value="nearest">
+                                <label for="imageDownsampleMethodNearest">Pixelated</label>
+                            </span>
+                        </div>
+                    </article>
+                </fieldset>
+            </div>
             <div id="imageHeightCap" class="invisible">
                 <legend>Maximum Image Height</legend>
                 <fieldset>

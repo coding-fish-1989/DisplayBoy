@@ -46,7 +46,7 @@
 
 use crate::{scaling, shader_support};
 
-use image::{Rgb, Rgba, RgbaImage};
+use image::{GenericImage, GenericImageView, Rgb, Rgba, RgbaImage};
 use scaling::*;
 use shader_support::*;
 
@@ -91,7 +91,7 @@ pub fn crt_inv_gamma(col: Rgb<f32>) -> Rgb<f32> {
 }
 
 #[inline(always)]
-fn apply_lut_rgb3d(col: Rgba<f32>, lut: &[Rgb<f32>; 32 * 32 * 32]) -> Rgb<f32> {
+fn apply_lut_rgb3d(col: Rgb<f32>, lut: &[Rgb<f32>; 32 * 32 * 32]) -> Rgb<f32> {
     let r = col[0];
     let g = col[1];
     let b = col[2];
@@ -136,13 +136,14 @@ fn apply_lut_rgb3d(col: Rgba<f32>, lut: &[Rgb<f32>; 32 * 32 * 32]) -> Rgb<f32> {
 }
 
 pub fn crt(
-    img: RgbaImage,
-    exif_orientation: u32,
-    src_scale: ScaleInfo,
+    img: &FloatImage,
+    src_scale: &ScaleInfo,
     scale: u32,
     explicit_aspect_ratio: bool,
     pixel_aspect_ratio: f32,
+    desired_aspect_ratio: f32,
 ) -> RgbaImage {
+    // Load LUT from embedded PNG
     let lut_png = include_bytes!("crt_lut.png");
     let lut_img = image::load_from_memory(lut_png).unwrap().to_rgba8();
     let mut lut = [Rgb::<f32>([0.0, 0.0, 0.0]); 32 * 32 * 32];
@@ -160,28 +161,11 @@ pub fn crt(
         }
     }
 
-    let load_buff = |x: i32, y: i32| -> Rgb<f32> {
-        if y < 0 || y >= img.height() as i32 || x < 0 || x >= img.width() as i32 {
-            return Rgb([0.0, 0.0, 0.0]);
-        }
-        let p = img.get_pixel(x as u32, y as u32);
-        let p = Rgba::<f32>([
-            p[0] as f32 / 255.0,
-            p[1] as f32 / 255.0,
-            p[2] as f32 / 255.0,
-            1.0,
-        ]);
-        apply_lut_rgb3d(p, &lut)
-    };
-
-    let (src_width, src_height) =
-        exif_orientation_dimension(img.width(), img.height(), exif_orientation);
-    let (target_width, target_height) =
-        calculate_scaled_buffer_size(src_width, src_height, &src_scale);
+    let (src_width, src_height) = (img.width(), img.height());
 
     // Automatic height padding for devices like SNES
-    let vertical_padding = if target_height < 240 && target_height >= 224 {
-        let total_pad = 240 - target_height;
+    let vertical_padding = if src_height < 240 && src_height >= 224 {
+        let total_pad = 240 - src_height;
         // Split padding evenly, with the remainder going to the bottom
         let pad_top = total_pad / 2;
         let pad_bottom = total_pad - pad_top;
@@ -196,8 +180,7 @@ pub fn crt(
         // The source image might be a different aspect ratio than the target
         // This can happen if the image was upscaled and then stretched to reflect the non square pixel.
         // The following code will respect the source image's aspect ratio and calculated the output width factor.
-        let desired_aspect_ratio = src_width as f32 / src_height as f32;
-        let source_aspect_ratio = target_width as f32 / target_height as f32;
+        let source_aspect_ratio = src_width as f32 / src_height as f32;
         desired_aspect_ratio / source_aspect_ratio
     } else {
         1.0
@@ -208,37 +191,25 @@ pub fn crt(
     let left_margin = (CRT_MARGIN as f32 / output_width_factor).ceil() as u32;
 
     // Create a source buffer with margins
-    let (buff_width, buff_height) = (
-        target_width + left_margin * 2,
-        target_height + CRT_MARGIN * 2 + vertical_padding.0 + vertical_padding.1,
+    let (padded_width, padded_height) = (
+        src_width + left_margin * 2,
+        src_height + CRT_MARGIN * 2 + vertical_padding.0 + vertical_padding.1,
     );
-    let mut buff = FloatImage::new(buff_width, buff_height);
 
-    // Note that target_width and target_height are being used to scale here on purpose.
-    // buff_width and buff_height are only the size of the output buffer, and does not affect the nearest neighbor scaling.
-    let x_target_half_texel = 1.0 / (target_width as f32 * 2.0);
-    let y_target_half_texel = 1.0 / (target_height as f32 * 2.0);
-    for y in 0..buff_height {
-        for x in 0..buff_width {
-            // Nearest neighbor downscale
-            let x_coord =
-                (x as i32 - left_margin as i32) as f32 / target_width as f32 + x_target_half_texel;
-            let y_coord =
-                (y as i32 - top_margin as i32) as f32 / target_height as f32 + y_target_half_texel;
-            let x_src = (x_coord * src_width as f32).floor() as i32;
-            let y_src = (y_coord * src_height as f32).floor() as i32;
-            let (x_src, y_src) = exif_orientation_transform_coordinate(
-                src_width,
-                src_height,
-                exif_orientation,
-                x_src,
-                y_src,
-            );
-            buff.put_pixel(x, y, load_buff(x_src, y_src));
+    // Rotate, add margin, and apply LUT
+    let src_img = FloatImage::from_fn(padded_width, padded_height, |x, y| {
+        let (x, y) = (
+            (x as i32) - left_margin as i32,
+            (y as i32) - top_margin as i32,
+        );
+        if y < 0 || y >= img.height() as i32 || x < 0 || x >= img.width() as i32 {
+            Rgb([0.0, 0.0, 0.0])
+        } else {
+            unsafe { apply_lut_rgb3d(img.unsafe_get_pixel(x as u32, y as u32), &lut) }
         }
-    }
+    });
 
-    let (src_width, src_height) = (buff_width, buff_height);
+    let (src_width, src_height) = (padded_width, padded_height);
     let (width, height) = (
         (src_width as f32 * scale as f32 * output_width_factor).ceil() as u32,
         src_height * scale,
@@ -248,10 +219,10 @@ pub fn crt(
     let src_height_f = src_height as f32;
 
     let load_buff = |x: i32, y: i32| -> Rgb<f32> {
-        if y < 0 || y >= src_height as i32 || x < 0 || x >= src_width as i32 {
+        if x < 0 || x >= src_width as i32 || y < 0 || y >= src_height as i32 {
             return Rgb([0.0, 0.0, 0.0]);
         }
-        *buff.get_pixel(x as u32, y as u32)
+        unsafe { src_img.unsafe_get_pixel(x as u32, y as u32) }
     };
 
     let out_texel_size_x = 1.0 / width as f32;
@@ -347,16 +318,18 @@ pub fn crt(
 
             let p = color.clamp01();
 
-            out.put_pixel(
-                x,
-                y,
-                Rgba([
-                    float_to_byte(p[0]),
-                    float_to_byte(p[1]),
-                    float_to_byte(p[2]),
-                    255,
-                ]),
-            );
+            unsafe {
+                out.unsafe_put_pixel(
+                    x,
+                    y,
+                    Rgba([
+                        float_to_byte(p[0]),
+                        float_to_byte(p[1]),
+                        float_to_byte(p[2]),
+                        255,
+                    ]),
+                );
+            }
         }
     }
     out

@@ -63,6 +63,7 @@ pub fn process_image_gb(
     invert: bool,
     edge_enhancement_level: f32,
     height_cap: i32,
+    request_billinear: bool,
     data: Vec<u8>,
 ) -> String {
     set_panic_hook();
@@ -109,11 +110,11 @@ pub fn process_image_gb(
     };
 
     let adjustment = gb::GbColorAdjustment {
-        dither: dither,
-        brightness: brightness,
-        contrast: contrast,
-        invert: invert,
-        edge_enhancement_level: edge_enhancement_level,
+        dither,
+        brightness,
+        contrast,
+        invert,
+        edge_enhancement_level,
     };
 
     let src_scale = detect_src_scale(
@@ -125,13 +126,17 @@ pub fn process_image_gb(
             height_cap as u32
         },
     );
-    let result = gb::gb_mono(
-        img.into_rgba8(),
-        exif_orientation,
-        src_scale,
-        &prof,
-        &adjustment,
-    );
+
+    let use_bilinear = src_scale.bilinear_recommended && request_billinear;
+
+    let img = img.into_rgba8();
+    let img = if use_bilinear {
+        downsample_image_bilinear(&img, &src_scale, false, exif_orientation)
+    } else {
+        downsample_image_nearest_neighbour(&img, &src_scale, false, exif_orientation)
+    };
+
+    let result = gb::gb_mono(&img, &prof, &adjustment);
 
     let mut buf = Vec::new();
     let _ = result.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png);
@@ -149,6 +154,7 @@ pub fn process_image_gb_custom(
     invert: bool,
     edge_enhancement_level: f32,
     height_cap: i32,
+    request_billinear: bool,
     data: Vec<u8>,
 ) -> String {
     set_panic_hook();
@@ -169,11 +175,11 @@ pub fn process_image_gb_custom(
     };
 
     let adjustment = gb::GbColorAdjustment {
-        dither: dither,
-        brightness: brightness,
-        contrast: contrast,
-        invert: invert,
-        edge_enhancement_level: edge_enhancement_level,
+        dither,
+        brightness,
+        contrast,
+        invert,
+        edge_enhancement_level,
     };
 
     let src_scale = detect_src_scale(
@@ -185,13 +191,17 @@ pub fn process_image_gb_custom(
             height_cap as u32
         },
     );
-    let result = gb::gb_mono(
-        img.into_rgba8(),
-        exif_orientation,
-        src_scale,
-        &prof,
-        &adjustment,
-    );
+
+    let use_bilinear = src_scale.bilinear_recommended && request_billinear;
+
+    let img = img.into_rgba8();
+    let img = if use_bilinear {
+        downsample_image_bilinear(&img, &src_scale, false, exif_orientation)
+    } else {
+        downsample_image_nearest_neighbour(&img, &src_scale, false, exif_orientation)
+    };
+
+    let result = gb::gb_mono(&img, &prof, &adjustment);
 
     let mut buf = Vec::new();
     let _ = result.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png);
@@ -204,6 +214,7 @@ pub fn process_image_gbc(
     lcd_mode: u32,
     color_mode: u32,
     height_cap: i32,
+    request_billinear: bool,
     data: Vec<u8>,
 ) -> String {
     set_panic_hook();
@@ -298,14 +309,17 @@ pub fn process_image_gbc(
     let (width, height) = exif_orientation_dimension(img.width(), img.height(), exif_orientation);
 
     let src_scale = detect_src_scale(width, height, fallback_height);
-    let result = gbc::color_gb(
-        img.into_rgba8(),
-        exif_orientation,
-        src_scale,
-        scale,
-        lcd_mode,
-        &prof,
-    );
+
+    let use_bilinear = src_scale.bilinear_recommended && request_billinear;
+
+    let img = img.into_rgba8();
+    let img = if use_bilinear {
+        downsample_image_bilinear(&img, &src_scale, false, exif_orientation)
+    } else {
+        downsample_image_nearest_neighbour(&img, &src_scale, false, exif_orientation)
+    };
+
+    let result = gbc::color_gb(&img, scale, lcd_mode, &prof);
 
     let mut buf = Vec::new();
     let _ = result.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png);
@@ -318,6 +332,7 @@ pub fn process_image_crt(
     explicit_aspect_ratio: bool,
     pixel_aspect_ratio: f32,
     height_cap: i32,
+    request_billinear: bool,
     data: Vec<u8>,
 ) -> String {
     set_panic_hook();
@@ -325,6 +340,7 @@ pub fn process_image_crt(
     let exif_orientation = parse_exif_orientation(&data);
     let img = image::load_from_memory(&data).unwrap();
     let (width, height) = exif_orientation_dimension(img.width(), img.height(), exif_orientation);
+    let desired_aspect_ratio = width as f32 / height as f32;
 
     let src_scale = detect_src_scale(
         width,
@@ -335,13 +351,23 @@ pub fn process_image_crt(
             height_cap as u32
         },
     );
+
+    let use_bilinear = src_scale.bilinear_recommended && request_billinear;
+
+    let img = img.into_rgba8();
+    let img = if use_bilinear {
+        downsample_image_bilinear(&img, &src_scale, true, exif_orientation)
+    } else {
+        downsample_image_nearest_neighbour(&img, &src_scale, true, exif_orientation)
+    };
+
     let result = crt::crt(
-        img.into_rgba8(),
-        exif_orientation,
-        src_scale,
+        &img,
+        &src_scale,
         scale,
         explicit_aspect_ratio,
         pixel_aspect_ratio,
+        desired_aspect_ratio,
     );
 
     let mut buf = Vec::new();

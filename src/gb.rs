@@ -17,10 +17,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::{scaling, shader_support};
+use crate::shader_support;
 
-use image::{Luma, Rgb, Rgba, RgbaImage};
-use scaling::*;
+use image::{GenericImage, GenericImageView, Luma, Rgb, Rgba, RgbaImage};
 use shader_support::*;
 
 #[inline(always)]
@@ -28,7 +27,7 @@ fn load_alpha_checked(buff: &AlphaImage, x: i32, y: i32, width: u32, height: u32
     if x >= width as i32 || y >= height as i32 || x < 0 || y < 0 {
         return 0.0;
     }
-    buff.get_pixel(x as u32, y as u32)[0]
+    unsafe { buff.unsafe_get_pixel(x as u32, y as u32)[0] }
 }
 
 #[inline(always)]
@@ -151,14 +150,16 @@ fn bilinear_scale_alpha(
             let b = load_alpha_checked(from_buff, xi + 1, yi, from_width, from_height);
             let c = load_alpha_checked(from_buff, xi, yi + 1, from_width, from_height);
             let d = load_alpha_checked(from_buff, xi + 1, yi + 1, from_width, from_height);
-            to_buff.put_pixel(
-                x as u32,
-                y as u32,
-                Luma([((1.0 - xf) * (1.0 - yf) * a
-                    + xf * (1.0 - yf) * b
-                    + (1.0 - xf) * yf * c
-                    + xf * yf * d)]),
-            );
+            unsafe {
+                to_buff.unsafe_put_pixel(
+                    x as u32,
+                    y as u32,
+                    Luma([((1.0 - xf) * (1.0 - yf) * a
+                        + xf * (1.0 - yf) * b
+                        + (1.0 - xf) * yf * c
+                        + xf * yf * d)]),
+                );
+            }
         }
     }
 }
@@ -204,14 +205,11 @@ pub struct GbColorAdjustment {
 }
 
 pub fn gb_mono(
-    img: RgbaImage,
-    exif_orientation: u32,
-    src_scale: ScaleInfo,
+    img: &FloatImage,
     profile: &GbDisplayProfile,
     adjustment: &GbColorAdjustment,
 ) -> RgbaImage {
-    let (src_width, src_height) =
-        exif_orientation_dimension(img.width(), img.height(), exif_orientation);
+    let (src_width, src_height) = (img.width(), img.height());
 
     // Color configurations
     let fg = Rgb::<f32>([
@@ -228,68 +226,48 @@ pub fn gb_mono(
     ])
     .to_linear();
 
-    // Need to accommodate for non-integer scaling
-    let (target_width, target_height) =
-        calculate_scaled_buffer_size(src_width, src_height, &src_scale);
-
-    // Quantize to alpha, downscale to real device resolution, and store
-    let mut quantized_img = AlphaImage::new(target_width, target_height);
-    let x_target_half_texel = 1.0 / (target_width as f32 * 2.0);
-    let y_target_half_texel = 1.0 / (target_height as f32 * 2.0);
-    for y in 0..target_height {
-        for x in 0..target_width {
-            // Nearest neighbor downscale
-            let x_coord = x as f32 / target_width as f32 + x_target_half_texel;
-            let y_coord = y as f32 / target_height as f32 + y_target_half_texel;
-            let x_src = (x_coord * src_width as f32).floor() as u32;
-            let y_src = (y_coord * src_height as f32).floor() as u32;
-            let (x_src, y_src) = exif_orientation_transform_coordinate(
-                src_width,
-                src_height,
-                exif_orientation,
-                x_src as i32,
-                y_src as i32,
-            );
-            let c = img.get_pixel(x_src as u32, y_src as u32);
-            let c = rgba_u8_to_rgb_f32(*c).to_linear();
-            let l = c.luminance();
-            let l = if l <= (216.0 / 24389.0) {
-                l * (24389.0 / 27.0)
-            } else {
-                l.powf(1.0 / 3.0) * 116.0 - 16.0
-            };
-            let l = (l / 100.0).clamp(0.0, 1.0);
-            quantized_img.put_pixel(x, y, Luma([l]));
-        }
-    }
+    // Quantize to alpha
+    let quantized_img = AlphaImage::from_fn(src_width, src_height, |x, y| unsafe {
+        let c = img.unsafe_get_pixel(x, y);
+        let l = c.luminance();
+        let l = if l <= (216.0 / 24389.0) {
+            l * (24389.0 / 27.0)
+        } else {
+            l.powf(1.0 / 3.0) * 116.0 - 16.0
+        };
+        let l = (l / 100.0).clamp(0.0, 1.0);
+        Luma([l])
+    });
 
     // Apply adjustments
-    let mut adjusted_img = AlphaImage::new(target_width, target_height);
+    let mut adjusted_img = AlphaImage::new(src_width, src_height);
     {
         let threshold_kernel = build_threshold_kernel(adjustment);
         let edge_enhancement_level = adjustment.edge_enhancement_level;
         let mut y_up = 0;
-        for y in 0..target_height {
-            let y_down = (y + 1).min(target_height - 1);
+        for y in 0..src_height {
+            let y_down = (y + 1).min(src_height - 1);
 
             let mut x_left = 0;
-            for x in 0..target_width {
-                let mut l = quantized_img.get_pixel(x, y)[0];
+            for x in 0..src_width {
+                unsafe {
+                    let mut l = quantized_img.unsafe_get_pixel(x, y)[0];
 
-                // Apply edge enhancement
-                // https://github.com/LIJI32/SameBoy/blob/master/Core/camera.c
-                if edge_enhancement_level > 0.0 {
-                    let x_right = (x + 1).min(target_width - 1);
-                    l += (l * 4.0) * edge_enhancement_level;
-                    l -= quantized_img.get_pixel(x_left, y)[0] * edge_enhancement_level;
-                    l -= quantized_img.get_pixel(x_right, y)[0] * edge_enhancement_level;
-                    l -= quantized_img.get_pixel(x, y_up)[0] * edge_enhancement_level;
-                    l -= quantized_img.get_pixel(x, y_down)[0] * edge_enhancement_level;
+                    // Apply edge enhancement
+                    // https://github.com/LIJI32/SameBoy/blob/master/Core/camera.c
+                    if edge_enhancement_level > 0.0 {
+                        let x_right = (x + 1).min(src_width - 1);
+                        l += (l * 4.0) * edge_enhancement_level;
+                        l -= quantized_img.unsafe_get_pixel(x_left, y)[0] * edge_enhancement_level;
+                        l -= quantized_img.unsafe_get_pixel(x_right, y)[0] * edge_enhancement_level;
+                        l -= quantized_img.unsafe_get_pixel(x, y_up)[0] * edge_enhancement_level;
+                        l -= quantized_img.unsafe_get_pixel(x, y_down)[0] * edge_enhancement_level;
+                    }
+
+                    let alpha = apply_threshold_kernel(l, x, y, &threshold_kernel, &adjustment)
+                        * fg_opacity;
+                    adjusted_img.unsafe_put_pixel(x, y, Luma([alpha]));
                 }
-
-                let alpha =
-                    apply_threshold_kernel(l, x, y, &threshold_kernel, &adjustment) * fg_opacity;
-                adjusted_img.put_pixel(x, y, Luma([alpha]));
 
                 x_left = x;
             }
@@ -297,8 +275,6 @@ pub fn gb_mono(
             y_up = y;
         }
     }
-
-    let (src_width, src_height) = (target_width, target_height);
 
     // Don't change this without revising pretty much everything after this
     let scale = 5;
@@ -315,24 +291,29 @@ pub fn gb_mono(
 
     // Prepare buffers for separable gaussian blur
     // Should be about 2.46 MB on memory per buffer for full GB resolution with margin above
-    let mut bg_ping_buff = AlphaImage::new(out_width, out_height);
-    let mut bg_pong_buff = AlphaImage::new(out_width, out_height);
 
     // Upscale with grid line
-    for y in 0..height {
-        for x in 0..width {
-            // Gap between pixels. This code only works for resolution scale of 5.
-            if (x % 5) >= 4 || (y % 5) >= 4 {
-                continue;
-            }
+    let mut bg_ping_buff = AlphaImage::from_fn(out_width, out_height, |x, y| {
+        let x = x as i32 - margin as i32;
+        let y = y as i32 - margin as i32;
 
-            bg_ping_buff.put_pixel(
-                x + margin as u32,
-                y + margin as u32,
-                *adjusted_img.get_pixel(x / scale as u32, y / scale as u32),
-            );
+        // Margin
+        if x < 0 || y < 0 || x >= width as i32 || y >= height as i32 {
+            return Luma([0.0]);
         }
-    }
+
+        // Gap between pixels. This code only works for resolution scale of 5.
+        if (x % 5) >= 4 || (y % 5) >= 4 {
+            return Luma([0.0]);
+        }
+
+        let x = x / scale as i32;
+        let y = y / scale as i32;
+        let alpha = unsafe { adjusted_img.unsafe_get_pixel(x as u32, y as u32)[0] };
+        Luma([alpha])
+    });
+
+    let mut bg_pong_buff = AlphaImage::new(out_width, out_height);
 
     // Apply small blur to smear the pixel edges
     {
@@ -595,22 +576,24 @@ pub fn gb_mono(
                 out_height,
             );
             let shadow = shadow * shadow_opacity;
-            let c = bg.mult_f(1.0 - shadow);
+            let color = bg.mult_f(1.0 - shadow);
             // Alpha blend foreground
             let opacity = load_alpha_checked(&fg_buff, x as i32, y as i32, out_width, out_height);
-            let c = fg.mult_f(opacity).add(c.mult_f(1.0 - opacity));
+            let color = fg.mult_f(opacity).add(color.mult_f(1.0 - opacity));
             // Gamma compression
-            let c = c.to_gamma();
-            out.put_pixel(
-                x as u32,
-                y as u32,
-                Rgba([
-                    float_to_byte(c[0]),
-                    float_to_byte(c[1]),
-                    float_to_byte(c[2]),
-                    255,
-                ]),
-            );
+            let color = color.to_gamma();
+            unsafe {
+                out.unsafe_put_pixel(
+                    x as u32,
+                    y as u32,
+                    Rgba([
+                        float_to_byte(color[0]),
+                        float_to_byte(color[1]),
+                        float_to_byte(color[2]),
+                        255,
+                    ]),
+                );
+            }
         }
     }
     out

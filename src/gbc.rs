@@ -17,10 +17,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::{scaling, shader_support};
+use crate::shader_support;
 
-use image::{Rgb, Rgba, RgbaImage};
-use scaling::*;
+use image::{GenericImage, GenericImageView, Rgb, Rgba, RgbaImage};
 use shader_support::*;
 
 pub struct DisplayProfile {
@@ -61,6 +60,7 @@ fn int_smear(x: f32, dx: f32, d: f32, coeffs: &[f32; 7]) -> f32 {
 #[inline(always)]
 fn color_correct(c: Rgb<f32>, p: &DisplayProfile) -> Rgb<f32> {
     let gamma = p.gamma + p.gamma_offset;
+    let c = c.clamp01();
     let c = c.pow_f(gamma / p.gamma);
     let c = c.mult_f(p.lum);
     let c = c.clamp01();
@@ -71,68 +71,30 @@ fn color_correct(c: Rgb<f32>, p: &DisplayProfile) -> Rgb<f32> {
     c.clamp01()
 }
 
-pub fn color_gb(
-    img: RgbaImage,
-    exif_orientation: u32,
-    src_scale: ScaleInfo,
-    scale: u32,
-    lcd_mode: u32,
-    prof: &DisplayProfile,
-) -> RgbaImage {
-    let (src_width, src_height) =
-        exif_orientation_dimension(img.width(), img.height(), exif_orientation);
+pub fn color_gb(img: &FloatImage, scale: u32, lcd_mode: u32, prof: &DisplayProfile) -> RgbaImage {
+    let (src_width, src_height) = (img.width(), img.height());
 
-    let (target_width, target_height) =
-        calculate_scaled_buffer_size(src_width, src_height, &src_scale);
-    let mut src_img = FloatImage::new(target_width, target_height);
-    let x_target_half_texel = 1.0 / (target_width as f32 * 2.0);
-    let y_target_half_texel = 1.0 / (target_height as f32 * 2.0);
-    for y in 0..target_height {
-        for x in 0..target_width {
-            let x_coord = x as f32 / target_width as f32 + x_target_half_texel;
-            let y_coord = y as f32 / target_height as f32 + y_target_half_texel;
-            let x_src = (x_coord * src_width as f32).floor() as u32;
-            let y_src = (y_coord * src_height as f32).floor() as u32;
-            let (x_src, y_src) = exif_orientation_transform_coordinate(
-                src_width,
-                src_height,
-                exif_orientation,
-                x_src as i32,
-                y_src as i32,
-            );
-            let p = img.get_pixel(x_src as u32, y_src as u32);
-            let p = rgba_u8_to_rgb_f32(*p).to_linear();
-            src_img.put_pixel(x, y, p);
-        }
-    }
-
-    let src_width = src_img.width();
-    let src_height = src_img.height();
     let width = src_width * scale;
     let height = src_height * scale;
 
     let src_width_f = src_width as f32;
     let src_height_f = src_height as f32;
 
-    let point_sample_buff = |x: f32, y: f32| -> Rgb<f32> {
-        let x = ((x * src_width_f).floor() as i32)
-            .min(src_width as i32 - 1)
-            .max(0) as u32;
-        let y = ((y * src_height_f).floor() as i32)
-            .min(src_height as i32 - 1)
-            .max(0) as u32;
-        *src_img.get_pixel(x, y)
+    let load_img = |x: i32, y: i32| -> Rgb<f32> {
+        unsafe {
+            img.unsafe_get_pixel(
+                x.min(src_width as i32 - 1).max(0) as u32,
+                y.min(src_height as i32 - 1).max(0) as u32,
+            )
+        }
     };
 
-    let load_buff = |x: i32, y: i32| -> Rgb<f32> {
-        *src_img.get_pixel(
-            x.min(src_width as i32 - 1).max(0) as u32,
-            y.min(src_height as i32 - 1).max(0) as u32,
-        )
+    let sample_img = |x: f32, y: f32| -> Rgb<f32> {
+        let x = (x * src_width_f).floor() as i32;
+        let y = (y * src_height_f).floor() as i32;
+        load_img(x, y)
     };
 
-    let texel_size_x = 1.0 / src_width_f;
-    let texel_size_y = 1.0 / src_height_f;
     let out_texel_size_x = 1.0 / width as f32;
     let out_texel_size_y = 1.0 / height as f32;
 
@@ -161,14 +123,12 @@ pub fn color_gb(
 
     let mut out = RgbaImage::new(width as u32, height as u32);
 
-    for y in (0..height).step_by(1) {
+    for y in 0..height {
         let tex_coord_y = out_texel_size_y * (y as f32 + 0.5);
-        for x in (0..width).step_by(1) {
+        for x in 0..width {
             let tex_coord_x = out_texel_size_x * (x as f32 + 0.5);
 
-            let mut p: Rgb<f32>;
-
-            if lcd_mode == 1 {
+            let color = if lcd_mode == 1 {
                 let tli_x = (tex_coord_x * src_width_f - 0.4999) as i32;
                 let tli_y = (tex_coord_y * src_height_f - 0.4999) as i32;
 
@@ -206,13 +166,12 @@ pub fn color_gb(
                 let tcol = int_smear(subpix, rsubpix, 0.63, &coeffs_y);
                 let bcol = int_smear(subpix - 1.0, rsubpix, 0.63, &coeffs_y);
 
-                let top_left_color = load_buff(tli_x, tli_y).mult(lcol).mult_f(tcol);
+                let top_left_color = load_img(tli_x, tli_y).mult(lcol).mult_f(tcol);
+                let top_right_color = load_img(tli_x + 1, tli_y).mult(rcol).mult_f(tcol);
+                let bottom_left_color = load_img(tli_x, tli_y + 1).mult(lcol).mult_f(bcol);
+                let bottom_right_color = load_img(tli_x + 1, tli_y + 1).mult(rcol).mult_f(bcol);
 
-                let bottom_right_color = load_buff(tli_x + 1, tli_y + 1).mult(rcol).mult_f(bcol);
-                let bottom_left_color = load_buff(tli_x, tli_y + 1).mult(lcol).mult_f(bcol);
-                let top_right_color = load_buff(tli_x + 1, tli_y).mult(rcol).mult_f(tcol);
-
-                p = top_left_color
+                top_left_color
                     .add(bottom_right_color)
                     .add(bottom_left_color)
                     .add(top_right_color)
@@ -243,34 +202,46 @@ pub fn color_gb(
                 let sub_pos_x = (tex_coord_x * src_width_f).fract() * 6.0;
                 let sub_pos_y = (tex_coord_y * src_height_f).fract() * 6.0;
 
-                let mut center = point_sample_buff(tex_coord_x, tex_coord_y);
-                let mut left = point_sample_buff(tex_coord_x - texel_size_x, tex_coord_y);
-                let mut right = point_sample_buff(tex_coord_x + texel_size_x, tex_coord_y);
+                let mut left = sample_img(tex_coord_x - out_texel_size_x, tex_coord_y);
+                let mut center = sample_img(tex_coord_x, tex_coord_y);
+                let mut right = sample_img(tex_coord_x + out_texel_size_x, tex_coord_y);
 
                 if sub_pos_y < 1.0 {
-                    let top_n = point_sample_buff(tex_coord_x, tex_coord_y - texel_size_y);
-                    let left_n =
-                        point_sample_buff(tex_coord_x - texel_size_x, tex_coord_y - texel_size_y);
-                    let right_n =
-                        point_sample_buff(tex_coord_x + texel_size_x, tex_coord_y - texel_size_y);
-                    center = lerp_color(center, top_n, 0.5 - sub_pos_y * 0.5);
+                    let left_n = sample_img(
+                        tex_coord_x - out_texel_size_x,
+                        tex_coord_y - out_texel_size_y,
+                    );
                     left = lerp_color(left, left_n, 0.5 - sub_pos_y * 0.5);
-                    right = lerp_color(right, right_n, 0.5 - sub_pos_y * 0.5);
-                    center = center.mult_f(sub_pos_y * scanline_depth + (1.0 - scanline_depth));
                     left = left.mult_f(sub_pos_y * scanline_depth + (1.0 - scanline_depth));
+
+                    let top_n = sample_img(tex_coord_x, tex_coord_y - out_texel_size_y);
+                    center = lerp_color(center, top_n, 0.5 - sub_pos_y * 0.5);
+                    center = center.mult_f(sub_pos_y * scanline_depth + (1.0 - scanline_depth));
+
+                    let right_n = sample_img(
+                        tex_coord_x + out_texel_size_x,
+                        tex_coord_y - out_texel_size_y,
+                    );
+                    right = lerp_color(right, right_n, 0.5 - sub_pos_y * 0.5);
                     right = right.mult_f(sub_pos_y * scanline_depth + (1.0 - scanline_depth));
                 } else if sub_pos_y > 5.0 {
-                    let bottom_n = point_sample_buff(tex_coord_x, tex_coord_y + texel_size_y);
-                    let left_n =
-                        point_sample_buff(tex_coord_x - texel_size_x, tex_coord_y + texel_size_y);
-                    let right_n =
-                        point_sample_buff(tex_coord_x + texel_size_x, tex_coord_y + texel_size_y);
-                    center = lerp_color(center, bottom_n, (sub_pos_y - 5.0) * 0.5);
+                    let left_n = sample_img(
+                        tex_coord_x - out_texel_size_x,
+                        tex_coord_y + out_texel_size_y,
+                    );
                     left = lerp_color(left, left_n, (sub_pos_y - 5.0) * 0.5);
-                    right = lerp_color(right, right_n, (sub_pos_y - 5.0) * 0.5);
+                    left = left.mult_f((6.0 - sub_pos_y) * scanline_depth + (1.0 - scanline_depth));
+
+                    let bottom_n = sample_img(tex_coord_x, tex_coord_y + out_texel_size_y);
+                    center = lerp_color(center, bottom_n, (sub_pos_y - 5.0) * 0.5);
                     center =
                         center.mult_f((6.0 - sub_pos_y) * scanline_depth + (1.0 - scanline_depth));
-                    left = left.mult_f((6.0 - sub_pos_y) * scanline_depth + (1.0 - scanline_depth));
+
+                    let right_n = sample_img(
+                        tex_coord_x + out_texel_size_x,
+                        tex_coord_y + out_texel_size_y,
+                    );
+                    right = lerp_color(right, right_n, (sub_pos_y - 5.0) * 0.5);
                     right =
                         right.mult_f((6.0 - sub_pos_y) * scanline_depth + (1.0 - scanline_depth));
                 }
@@ -279,7 +250,7 @@ pub fn color_gb(
                 let mid_right = lerp_color(right, center, 0.5);
 
                 if sub_pos_x < 1.0 {
-                    p = lerp_color(
+                    lerp_color(
                         Rgb::<f32>([
                             color_high * center[0],
                             color_low * center[1],
@@ -291,9 +262,9 @@ pub fn color_gb(
                             color_low * left[2],
                         ]),
                         sub_pos_x,
-                    );
+                    )
                 } else if sub_pos_x < 2.0 {
-                    p = lerp_color(
+                    lerp_color(
                         Rgb::<f32>([
                             color_high * center[0],
                             color_low * center[1],
@@ -305,9 +276,9 @@ pub fn color_gb(
                             color_low * mid_left[2],
                         ]),
                         sub_pos_x - 1.0,
-                    );
+                    )
                 } else if sub_pos_x < 3.0 {
-                    p = lerp_color(
+                    lerp_color(
                         Rgb::<f32>([
                             color_high * center[0],
                             color_high * center[1],
@@ -319,9 +290,9 @@ pub fn color_gb(
                             color_low * center[2],
                         ]),
                         sub_pos_x - 2.0,
-                    );
+                    )
                 } else if sub_pos_x < 4.0 {
-                    p = lerp_color(
+                    lerp_color(
                         Rgb::<f32>([
                             color_low * mid_right[0],
                             color_high * center[1],
@@ -333,9 +304,9 @@ pub fn color_gb(
                             color_high * center[2],
                         ]),
                         sub_pos_x - 3.0,
-                    );
+                    )
                 } else if sub_pos_x < 5.0 {
-                    p = lerp_color(
+                    lerp_color(
                         Rgb::<f32>([
                             color_low * right[0],
                             color_high * center[1],
@@ -347,9 +318,9 @@ pub fn color_gb(
                             color_high * center[2],
                         ]),
                         sub_pos_x - 4.0,
-                    );
+                    )
                 } else {
-                    p = lerp_color(
+                    lerp_color(
                         Rgb::<f32>([
                             color_low * right[0],
                             color_low * mid_right[1],
@@ -361,25 +332,26 @@ pub fn color_gb(
                             color_high * center[2],
                         ]),
                         sub_pos_x - 5.0,
-                    );
+                    )
                 }
             } else {
-                p = point_sample_buff(tex_coord_x, tex_coord_y);
-            }
+                sample_img(tex_coord_x, tex_coord_y)
+            };
 
-            p = p.clamp01();
-            p = color_correct(p, &prof);
-            p = p.to_gamma();
-            out.put_pixel(
-                x as u32,
-                y as u32,
-                Rgba::<u8>([
-                    float_to_byte(p[0]),
-                    float_to_byte(p[1]),
-                    float_to_byte(p[2]),
-                    255,
-                ]),
-            );
+            let color = color_correct(color, &prof).to_gamma();
+
+            unsafe {
+                out.unsafe_put_pixel(
+                    x as u32,
+                    y as u32,
+                    Rgba::<u8>([
+                        float_to_byte(color[0]),
+                        float_to_byte(color[1]),
+                        float_to_byte(color[2]),
+                        255,
+                    ]),
+                );
+            }
         }
     }
 

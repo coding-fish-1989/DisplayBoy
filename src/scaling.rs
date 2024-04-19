@@ -17,8 +17,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::utils;
+use crate::{
+    shader_support::{self, lerp_color, rgba_u8_to_rgb_f32, FloatImage, ShaderSupport},
+    utils,
+};
 
+use image::{GenericImageView, Rgb, RgbaImage};
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
@@ -27,6 +31,7 @@ pub struct ScaleInfo {
     pub scale_y: f32,
     pub respect_input_aspect_ratio: bool,
     pub detected: bool,
+    pub bilinear_recommended: bool,
     pub device_name: String,
 }
 
@@ -48,6 +53,7 @@ pub fn detect_src_scale(width: u32, height: u32, fallback_height: u32) -> ScaleI
             scale_y: scale,
             respect_input_aspect_ratio: false,
             detected: true,
+            bilinear_recommended: false,
             device_name: "GBA".to_string(),
         }
     } else if (aspect_ratio - (160.0 / 144.0)).abs() < 0.001 {
@@ -58,6 +64,7 @@ pub fn detect_src_scale(width: u32, height: u32, fallback_height: u32) -> ScaleI
             scale_y: scale,
             respect_input_aspect_ratio: false,
             detected: true,
+            bilinear_recommended: false,
             device_name: "GB/GBC".to_string(),
         }
     } else if (aspect_ratio - (256.0 / 224.0)).abs() < 0.001
@@ -74,6 +81,7 @@ pub fn detect_src_scale(width: u32, height: u32, fallback_height: u32) -> ScaleI
             scale_y: scale,
             respect_input_aspect_ratio: false,
             detected: true,
+            bilinear_recommended: false,
             device_name: if is_gb_camera {
                 "GB Camera"
             } else {
@@ -90,6 +98,7 @@ pub fn detect_src_scale(width: u32, height: u32, fallback_height: u32) -> ScaleI
             scale_y: scale,
             respect_input_aspect_ratio: false,
             detected: true,
+            bilinear_recommended: false,
             device_name: "NES".to_string(),
         }
     } else if (aspect_ratio - (240.0 / 224.0)).abs() < 0.001
@@ -103,6 +112,7 @@ pub fn detect_src_scale(width: u32, height: u32, fallback_height: u32) -> ScaleI
             scale_y: scale,
             respect_input_aspect_ratio: false,
             detected: true,
+            bilinear_recommended: false,
             device_name: "NES".to_string(),
         }
     } else if (aspect_ratio - (64.0 / 49.0)).abs() < 0.001
@@ -114,6 +124,7 @@ pub fn detect_src_scale(width: u32, height: u32, fallback_height: u32) -> ScaleI
             scale_y: height as f32 / 224.0,
             respect_input_aspect_ratio: true,
             detected: true,
+            bilinear_recommended: false,
             device_name: "CRT (224) - PAR (8:7)".to_string(),
         }
     } else if (aspect_ratio - (128.0 / 105.0)).abs() < 0.001
@@ -125,6 +136,7 @@ pub fn detect_src_scale(width: u32, height: u32, fallback_height: u32) -> ScaleI
             scale_y: height as f32 / 240.0,
             respect_input_aspect_ratio: true,
             detected: true,
+            bilinear_recommended: false,
             device_name: "CRT (240) - PAR (8:7)".to_string(),
         }
     } else if width == 512 && (height == 240 || height == 224) {
@@ -135,6 +147,7 @@ pub fn detect_src_scale(width: u32, height: u32, fallback_height: u32) -> ScaleI
             scale_y: 1.0,
             respect_input_aspect_ratio: false,
             detected: true,
+            bilinear_recommended: false,
             device_name: "SNES (agg23)".to_string(),
         }
     } else {
@@ -144,6 +157,7 @@ pub fn detect_src_scale(width: u32, height: u32, fallback_height: u32) -> ScaleI
             scale_y: scale,
             respect_input_aspect_ratio: false,
             detected: false,
+            bilinear_recommended: scale > 1.0,
             device_name: "Unknown".to_string(),
         }
     }
@@ -200,4 +214,124 @@ pub fn exif_orientation_transform_coordinate(
         8 => (height - y - 1, x),
         _ => (x, y),
     }
+}
+
+pub fn downsample_image_nearest_neighbour(
+    src: &RgbaImage,
+    scale: &ScaleInfo,
+    output_gamma: bool,
+    exif_orientation: u32,
+) -> FloatImage {
+    let (src_width, src_height) =
+        exif_orientation_dimension(src.width(), src.height(), exif_orientation);
+    let (dst_width, dst_height) = calculate_scaled_buffer_size(src_width, src_height, scale);
+
+    // Downsample while applying EXIF orientation
+    let mut out = FloatImage::from_fn(dst_width, dst_height, |x, y| {
+        let x_coord = (x as f32 + 0.5) / dst_width as f32;
+        let y_coord = (y as f32 + 0.5) / dst_height as f32;
+        let src_x = (x_coord * src_width as f32) as u32;
+        let src_y = (y_coord * src_height as f32) as u32;
+        let (src_x, src_y) = exif_orientation_transform_coordinate(
+            src_width,
+            src_height,
+            exif_orientation,
+            src_x as i32,
+            src_y as i32,
+        );
+        rgba_u8_to_rgb_f32(*src.get_pixel(src_x as u32, src_y as u32))
+    });
+
+    if output_gamma {
+        out
+    } else {
+        // Convert to linear if needed
+        out.enumerate_pixels_mut().for_each(|(_x, _y, pixel)| {
+            *pixel = pixel.to_linear();
+        });
+        out
+    }
+}
+
+pub fn downsample_image_bilinear(
+    src: &RgbaImage,
+    scale: &ScaleInfo,
+    output_gamma: bool,
+    exif_orientation: u32,
+) -> FloatImage {
+    let (src_width, src_height) =
+        exif_orientation_dimension(src.width(), src.height(), exif_orientation);
+    let (final_dst_width, final_dst_height) =
+        calculate_scaled_buffer_size(src_width, src_height, scale);
+
+    // Precompute gamma (u8) to linear (f32) conversion table
+    let mut gamma_to_linear = [0.0; 256];
+    for i in 0..256 {
+        gamma_to_linear[i] = shader_support::to_linear(i as f32 / 255.0);
+    }
+
+    // Convert gamma to linear while applying EXIF orientation
+    // Bilinear interpolation is done in linear space for better quality.
+    let mut src = FloatImage::from_fn(src_width, src_height, |x, y| unsafe {
+        let (x, y) = exif_orientation_transform_coordinate(
+            src_width,
+            src_height,
+            exif_orientation,
+            x as i32,
+            y as i32,
+        );
+        let pixel = src.unsafe_get_pixel(x as u32, y as u32);
+        let r = gamma_to_linear[pixel[0] as usize];
+        let g = gamma_to_linear[pixel[1] as usize];
+        let b = gamma_to_linear[pixel[2] as usize];
+        Rgb::<f32>([r, g, b])
+    });
+
+    // Downsample the image using bilinear interpolation to the final resolution.
+    // This is done in multiple passes to avoid aliasing artifacts.
+    while src.width() > final_dst_width {
+        let (src_width, src_height) = (src.width(), src.height());
+        let (dst_width, dst_height) = if src_width as f32 / 2.0 > final_dst_width as f32 {
+            (
+                conservative_ceil_to_u32(src_width as f32 / 2.0),
+                conservative_ceil_to_u32(src_height as f32 / 2.0),
+            )
+        } else {
+            (final_dst_width, final_dst_height)
+        };
+
+        let width_max = src_width - 1;
+        let height_max = src_height - 1;
+        let next = FloatImage::from_fn(dst_width, dst_height, |x, y| {
+            let yf = y as f32 + 0.5;
+            let y_weight = (yf * src_height as f32 / dst_height as f32) % 1.0;
+
+            let xf = x as f32 + 0.5;
+            let x_weight = (xf * src_width as f32 / dst_width as f32) % 1.0;
+
+            let src_x = (xf * src_width as f32 / dst_width as f32) as u32;
+            let src_y = (yf * src_height as f32 / dst_height as f32) as u32;
+            unsafe {
+                let p00 = src.unsafe_get_pixel(src_x, src_y);
+                let p01 = src.unsafe_get_pixel((src_x + 1).min(width_max), src_y);
+                let p10 = src.unsafe_get_pixel(src_x, (src_y + 1).min(height_max));
+                let p11 =
+                    src.unsafe_get_pixel((src_x + 1).min(width_max), (src_y + 1).min(height_max));
+                let p0 = lerp_color(p00, p01, x_weight);
+                let p1 = lerp_color(p10, p11, x_weight);
+                lerp_color(p0, p1, y_weight)
+            }
+        });
+
+        src = next;
+    }
+
+    // Back to gamma if needed
+    if output_gamma {
+        src.enumerate_pixels_mut().for_each(|(_x, _y, pixel)| {
+            *pixel = pixel.to_gamma();
+        });
+    }
+
+    src
 }
