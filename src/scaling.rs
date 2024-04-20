@@ -302,21 +302,27 @@ pub fn downsample_image_bilinear(
 
         let width_max = src_width - 1;
         let height_max = src_height - 1;
+        let (scale_x, scale_y) = (
+            src_width as f32 / dst_width as f32,
+            src_height as f32 / dst_height as f32,
+        );
         let next = FloatImage::from_fn(dst_width, dst_height, |x, y| {
-            let yf = y as f32 + 0.5;
-            let y_weight = (yf * src_height as f32 / dst_height as f32) % 1.0;
+            let xf = (x as f32 + 0.5) * scale_x;
+            let yf = (y as f32 + 0.5) * scale_y;
 
-            let xf = x as f32 + 0.5;
-            let x_weight = (xf * src_width as f32 / dst_width as f32) % 1.0;
+            let src_x = xf as u32;
+            let src_y = yf as u32;
+            let x_weight = xf - src_x as f32;
+            let y_weight = yf - src_y as f32;
 
-            let src_x = (xf * src_width as f32 / dst_width as f32) as u32;
-            let src_y = (yf * src_height as f32 / dst_height as f32) as u32;
+            let src_x_next = (src_x + 1).min(width_max);
+            let src_y_next = (src_y + 1).min(height_max);
+
             unsafe {
                 let p00 = src.unsafe_get_pixel(src_x, src_y);
-                let p01 = src.unsafe_get_pixel((src_x + 1).min(width_max), src_y);
-                let p10 = src.unsafe_get_pixel(src_x, (src_y + 1).min(height_max));
-                let p11 =
-                    src.unsafe_get_pixel((src_x + 1).min(width_max), (src_y + 1).min(height_max));
+                let p01 = src.unsafe_get_pixel(src_x_next, src_y);
+                let p10 = src.unsafe_get_pixel(src_x, src_y_next);
+                let p11 = src.unsafe_get_pixel(src_x_next, src_y_next);
                 let p0 = lerp_color(p00, p01, x_weight);
                 let p1 = lerp_color(p10, p11, x_weight);
                 lerp_color(p0, p1, y_weight)
