@@ -300,25 +300,35 @@ pub fn downsample_image_bilinear(
             (final_dst_width, final_dst_height)
         };
 
-        let width_max = src_width - 1;
-        let height_max = src_height - 1;
-        let (scale_x, scale_y) = (
-            src_width as f32 / dst_width as f32,
-            src_height as f32 / dst_height as f32,
-        );
-        let next = FloatImage::from_fn(dst_width, dst_height, |x, y| {
-            let xf = (x as f32 + 0.5) * scale_x;
-            let yf = (y as f32 + 0.5) * scale_y;
+        if dst_width * 2 == src_width && dst_height * 2 == src_height {
+            // Exact half downsample fast path
+            src = FloatImage::from_fn(dst_width, dst_height, |x, y| unsafe {
+                let (src_x, src_y) = (x * 2, y * 2);
+                let p00 = src.unsafe_get_pixel(src_x, src_y);
+                let p01 = src.unsafe_get_pixel(src_x + 1, src_y);
+                let p10 = src.unsafe_get_pixel(src_x, src_y + 1);
+                let p11 = src.unsafe_get_pixel(src_x + 1, src_y + 1);
+                p00.add(p01).add(p10).add(p11).mult_f(0.25)
+            });
+        } else {
+            let width_max = src_width - 1;
+            let height_max = src_height - 1;
+            let (scale_x, scale_y) = (
+                src_width as f32 / dst_width as f32,
+                src_height as f32 / dst_height as f32,
+            );
+            src = FloatImage::from_fn(dst_width, dst_height, |x, y| unsafe {
+                let xf = ((x as f32 + 0.5) * scale_x - 0.5).max(0.0);
+                let yf = ((y as f32 + 0.5) * scale_y - 0.5).max(0.0);
 
-            let src_x = xf as u32;
-            let src_y = yf as u32;
-            let x_weight = xf - src_x as f32;
-            let y_weight = yf - src_y as f32;
+                let src_x = xf as u32;
+                let src_y = yf as u32;
+                let x_weight = xf - src_x as f32;
+                let y_weight = yf - src_y as f32;
 
-            let src_x_next = (src_x + 1).min(width_max);
-            let src_y_next = (src_y + 1).min(height_max);
+                let src_x_next = (src_x + 1).min(width_max);
+                let src_y_next = (src_y + 1).min(height_max);
 
-            unsafe {
                 let p00 = src.unsafe_get_pixel(src_x, src_y);
                 let p01 = src.unsafe_get_pixel(src_x_next, src_y);
                 let p10 = src.unsafe_get_pixel(src_x, src_y_next);
@@ -326,10 +336,8 @@ pub fn downsample_image_bilinear(
                 let p0 = lerp_color(p00, p01, x_weight);
                 let p1 = lerp_color(p10, p11, x_weight);
                 lerp_color(p0, p1, y_weight)
-            }
-        });
-
-        src = next;
+            });
+        }
     }
 
     // Back to gamma if needed

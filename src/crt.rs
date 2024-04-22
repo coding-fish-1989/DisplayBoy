@@ -196,7 +196,7 @@ pub fn crt(
         src_height + CRT_MARGIN * 2 + vertical_padding.0 + vertical_padding.1,
     );
 
-    // Rotate, add margin, and apply LUT
+    // Add margin, and apply LUT
     let src_img = FloatImage::from_fn(padded_width, padded_height, |x, y| {
         let (x, y) = (
             (x as i32) - left_margin as i32,
