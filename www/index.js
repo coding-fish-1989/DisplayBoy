@@ -14,6 +14,7 @@ let scaling = document.getElementById('scaling');
 let imageHeightCap = document.getElementById('imageHeightCap');
 let imageDownsampleMethod = document.getElementById('imageDownsampleMethod');
 let convertButton = document.getElementById('convertButton');
+let shareButton = document.getElementById('shareButton');
 let errorText = document.getElementById('convError');
 
 let brightnessRange = 100;
@@ -30,6 +31,15 @@ function inv_lerp(a, b, t) {
 
 function remap(value, low1, high1, low2, high2) {
     return lerp(low2, high2, inv_lerp(low1, high1, value));
+}
+
+function pngBytesToFile(base64, fileName) {
+    const byteCharacters = atob(base64);
+    const byteArray = new Uint8Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteArray[i] = byteCharacters.charCodeAt(i);
+    }
+    return new File([byteArray], fileName + "_DisplayBoy.png", { type: "image/png" });
 }
 
 fileInput.onchange = function () {
@@ -62,6 +72,7 @@ fileInput.onchange = function () {
 
 convertButton.onclick = function () {
     let files = fileInput.files;
+    let fileName = files[0].name.replace(/\.[^/.]+$/, "");
     var fileReader = new FileReader();
     fileReader.onload = function () {
         let data = new Uint8Array(fileReader.result)
@@ -95,7 +106,6 @@ convertButton.onclick = function () {
             invertValue = invert.checked;
         }
 
-
         var imageHeightCapValue = -1;
         if (imageHeightCapFormValue != "auto") {
             imageHeightCapValue = parseInt(imageHeightCapFormValue);
@@ -103,20 +113,18 @@ convertButton.onclick = function () {
 
         var requestBilinear = imageDownsampleMethodValue == "bilinear";
 
+        var imgData = null;
         if (colorModeValue < 3) {
-            let resDataBase64 = wasm.processImageGb(colorModeValue, ditherValue, brightnessValue, contrastValue, invertValue, edgeEnhancementLevelValue, imageHeightCapValue, requestBilinear, data);
-            fileOutput.src = "data:image/png;base64," + resDataBase64;
+            imgData = wasm.processImageGb(colorModeValue, ditherValue, brightnessValue, contrastValue, invertValue, edgeEnhancementLevelValue, imageHeightCapValue, requestBilinear, data);
         } else if (colorModeValue == 3) {
             let fgColor = gbFgColor.value;
             let bgColor = gbBgColor.value;
             let fgOpacity = gbFgOpacity.value;
-            let resDataBase64 = wasm.processImageGbCustom(fgColor, fgOpacity, bgColor, ditherValue, brightnessValue, contrastValue, invertValue, edgeEnhancementLevelValue, imageHeightCapValue, requestBilinear, data);
-            fileOutput.src = "data:image/png;base64," + resDataBase64;
+            imgData = wasm.processImageGbCustom(fgColor, fgOpacity, bgColor, ditherValue, brightnessValue, contrastValue, invertValue, edgeEnhancementLevelValue, imageHeightCapValue, requestBilinear, data);
         } else if (colorModeValue <= 7) {
             let scalingVal = parseInt(scaling.value);
             let lcdModeVal = parseInt(document.querySelector('input[name="lcdMode"]:checked').value);
-            let resDataBase64 = wasm.processImageGbc(scalingVal, lcdModeVal, colorModeValue - 4, imageHeightCapValue, requestBilinear, data);
-            fileOutput.src = "data:image/png;base64," + resDataBase64;
+            imgData = wasm.processImageGbc(scalingVal, lcdModeVal, colorModeValue - 4, imageHeightCapValue, requestBilinear, data);
         } else {
             let scalingVal = parseInt(scaling.value);
             let parVal = document.querySelector('input[name="par"]:checked').value;
@@ -130,9 +138,25 @@ convertButton.onclick = function () {
                 parVal = aspectRatioX / aspectRatioY;
                 explicitAspectRatio = true;
             }
-            let resDataBase64 = wasm.processImageCrt(scalingVal, explicitAspectRatio, parVal, imageHeightCapValue, requestBilinear, data);
-            fileOutput.src = "data:image/png;base64," + resDataBase64;
+            imgData = wasm.processImageCrt(scalingVal, explicitAspectRatio, parVal, imageHeightCapValue, requestBilinear, data);
         }
-    }
+
+        // Preview
+        fileOutput.src = "data:image/png;base64," + imgData;
+
+        // Share
+        if ('share' in navigator) {
+            shareButton.classList.remove("invisible");
+            shareButton.onclick = async () => {
+                let file = pngBytesToFile(imgData, fileName);
+                let shareData = {
+                    files: [file],
+                }
+                if (navigator.canShare(shareData)) {
+                    await navigator.share(shareData).catch(() => { });
+                }
+            }
+        }
+    };
     fileReader.readAsArrayBuffer(files[0]);
 };
